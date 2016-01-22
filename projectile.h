@@ -1,5 +1,5 @@
-#ifndef _MISSILE_H_
-#define _MISSILE_H_
+#ifndef _PROJECTILE_H_
+#define _PROJECTILE_H_
 
 #include <iostream>
 #include <hge.h>
@@ -14,7 +14,10 @@ class Ship;
 
 using std::string;
 
-class Missile
+#define ACTIVE_DURATION 3.5f
+#define SPR_PROJECTILE "Images/Bullet.png"
+
+class Projectile
 {
 	HTEXTURE tex_; //!< Handle to the sprite's texture
 	std::auto_ptr<hgeSprite> sprite_; //!< The sprite used to display the ship
@@ -29,20 +32,24 @@ class Missile
 	int damage, additional_damage;
 	float collision_X, collision_Y;
 	bool selfDamage;
+	bool active;
+	float activeTimer;
 
 public:
 	float angular_velocity;
-	Missile(char* filename, float x, float y, float w, int ownerID, string ownerName);
-	~Missile();
+	Projectile(char* filename, string ownerName);
+	~Projectile();
+	void Init(float x, float y, float w, int ownerID);
 	bool Update(std::vector<Ship*> &shiplist, float timedelta);
 	void Render();
 	bool HasCollided( Ship &ship );
 	float GetCollisionX(void);
 	float GetCollisionY(void);
 	string GetOwnerName(void);
-	float GetMissileDmg(void);
-	void SetMissilePower(int level);
+	float GetProjectileDmg(void);
+	void SetProjectilePower(int level);
 	bool GetSelfDamage(void);
+	bool GetActive(void);
 
 	void UpdateLoc( float x, float y, float w )
 	{

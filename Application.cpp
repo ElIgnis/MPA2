@@ -11,7 +11,7 @@
 #include <iostream>
 #include <fstream>
 
-// Lab 13 Task 9a : Uncomment the macro NETWORKMISSILE
+// Lab 13 Task 9a : Uncomment the macro NETWORKPROJECTILE
 #define NETWORKMISSLE
 
 
@@ -35,8 +35,6 @@ Application::Application()
 : hge_(hgeCreate(HGE_VERSION))
 , rakpeer_(RakNetworkFactory::GetRakPeerInterface())
 , timer_(0)
-// Lab 13 Task 2 : add new initializations
-, mymissile(0)
 , keydown_enter(false)
 , collision_X(0.f)
 , collision_Y(0.f)
@@ -90,11 +88,16 @@ bool Application::Init()
 		std::cin >> ShipName;
 		ships_.at(0)->SetName(ShipName.c_str());
 
-		//Initialise 10 explosion effects
-		for (int i = 0; i < 10; ++i)
+		//Initialise 50 explosion effects
+		for (int i = 0; i < 50; ++i)
 		{
-			explosion_efx = new explosion();
-			explosion_list.push_back(explosion_efx);
+			explosion_list.push_back(new explosion());
+		}
+
+		//Initialise 50 bullets
+		for (int i = 0; i < 50; ++i)
+		{
+			local_projlist.push_back(new Projectile(SPR_PROJECTILE, ShipName));
 		}
 
 		//Connect to server
@@ -164,11 +167,11 @@ bool Application::UpdateKeypress()
 	}
 
 	// Lab 13 Task 4 : Add a key to shoot missiles
-	if (hge_->Input_GetKeyState(HGEK_ENTER))
+	if (hge_->Input_GetKeyState(HGEK_SPACE))
 	{
 		if (!keydown_enter)
 		{
-			CreateMissile(ships_.at(0)->GetX(), ships_.at(0)->GetY(), ships_.at(0)->GetW(), ships_.at(0)->GetID(), ships_.at(0)->GetName());
+			CreateProjectile(ships_.at(0)->GetX(), ships_.at(0)->GetY(), ships_.at(0)->GetW(), ships_.at(0)->GetID(), ships_.at(0)->GetName());
 			keydown_enter = true;
 		}
 	}
@@ -184,6 +187,7 @@ bool Application::UpdateKeypress()
 }
 void Application::UpdateLocal(float dt)
 {
+	//Update ships collision
 	for (ShipList::iterator ship = ships_.begin(); ship != ships_.end(); ship++)
 	{
 		(*ship)->Update(dt);
@@ -193,43 +197,47 @@ void Application::UpdateLocal(float dt)
 			checkCollisions((*ship));
 	}
 
-	// Lab 13 Task 5 : Updating the missile
-	//Update local missile
-	if (mymissile)
+	//Update local projectile list
+	for (vector<Projectile*>::iterator itr = local_projlist.begin(); itr != local_projlist.end(); itr++)
 	{
-		if (mymissile->Update(ships_, dt))
+		if ((*itr)->Update(ships_, dt))
 		{
-			// have collision
-			CreateExplosion(mymissile->GetCollisionX(), mymissile->GetCollisionY());
-			if (mymissile->GetSelfDamage() == true)
-			{
-				std::cout << "Attacked by: Yourself" << std::endl;
-				ships_.at(0)->SetHealth(ships_.at(0)->GetHealth() - 20);
-				std::cout << ships_.at(0)->GetHealth() << std::endl;;
-			}
-			delete mymissile;
-			mymissile = 0;
-		}
-	}
-	// Lab 13 Task 13 : Update network missiles
-	//Update other's missile
-	for (MissileList::iterator missile = missiles_.begin(); missile != missiles_.end(); missile++)
-	{
-		if ((*missile)->Update(ships_, dt))
-		{
-			CreateExplosion((*missile)->GetCollisionX(), (*missile)->GetCollisionY());
+			CreateExplosion((*itr)->GetCollisionX(), (*itr)->GetCollisionY());
 
 			//Log and damage
-			if ((*missile)->GetSelfDamage() == false)
+			if ((*itr)->GetSelfDamage() == true)
 			{
-				std::cout << "Attacked by: " << (*missile)->GetOwnerName() << std::endl;
-				ships_.at(0)->SetHealth(ships_.at(0)->GetHealth() - 20);
+				std::cout << "Self inflicted damage of: " << (*itr)->GetProjectileDmg() << std::endl;
+				ships_.at(0)->SetHealth(ships_.at(0)->GetHealth() - (*itr)->GetProjectileDmg());
+				std::cout << ships_.at(0)->GetHealth() << std::endl;
+			}
+
+			//delete projectile upon collision
+			
+			//delete *itr;
+			//local_projlist.erase(itr);
+			break;
+		}
+	}
+
+	//Update network projectile list
+	for (vector<Projectile*>::iterator itr = net_projlist.begin(); itr != net_projlist.end(); itr++)
+	{
+		if ((*itr)->Update(ships_, dt))
+		{
+			CreateExplosion((*itr)->GetCollisionX(), (*itr)->GetCollisionY());
+
+			//Log and damage
+			if ((*itr)->GetSelfDamage() == false)
+			{
+				std::cout << "Received " << (*itr)->GetProjectileDmg() << " from: " << (*itr)->GetOwnerName() << std::endl;
+				ships_.at(0)->SetHealth(ships_.at(0)->GetHealth() - (*itr)->GetProjectileDmg());
 				std::cout << ships_.at(0)->GetHealth() << std::endl;
 			}
 			
-			// have collision 
-			delete *missile;
-			missiles_.erase(missile);
+			//delete projectile upon collision
+			//delete *itr;
+			//net_projlist.erase(itr);
 			break;
 		}
 	}
@@ -276,7 +284,6 @@ bool Application::UpdateNetwork(float dt)
 						   float x_, y_;
 						   int type_;
 						   std::string temp;
-						   //char chartemp[5];
 
 						   bs.Read(id);
 						   ships_.at(0)->setID(id);
@@ -291,8 +298,6 @@ bool Application::UpdateNetwork(float dt)
 							   bs.Read(type_);
 							   std::cout << "New Ship pos" << x_ << " " << y_ << std::endl;
 							   Ship* ship = new Ship(type_, x_, y_);
-							   //temp = "Ship ";
-							   //temp += _itoa(id, chartemp, 10);
 							   ship->SetName(rs.C_String());
 							   ship->setID(id);
 							   ships_.push_back(ship);
@@ -317,15 +322,13 @@ bool Application::UpdateNetwork(float dt)
 							   float x_, y_;
 							   int type_;
 							   std::string temp;
-							   //char chartemp[5];
+							   
 							   bs.Read(rs);
 							   bs.Read(x_);
 							   bs.Read(y_);
 							   bs.Read(type_);
 							   std::cout << "New Ship pos" << x_ << " " << y_ << std::endl;
 							   Ship* ship = new Ship(type_, x_, y_);
-							   //temp = "Ship ";
-							   //temp += _itoa(id, chartemp, 10);
 							   ship->SetName(rs.C_String());
 							   ship->setID(id);
 							   ships_.push_back(ship);
@@ -424,7 +427,6 @@ bool Application::UpdateNetwork(float dt)
 							   bs.Read(x);
 							   bs.Read(y);
 							   CreateExplosion(x, y);
-
 #ifdef INTERPOLATEMOVEMENT
 							   bs.Read(x);
 							   bs.Read(y);
@@ -437,7 +439,7 @@ bool Application::UpdateNetwork(float dt)
 
 
 		// Lab 13 Task 10 : new cases to handle missile on application side
-		case ID_NEWMISSILE:
+		case ID_NEWPROJECTILE:
 		{
 							  float x, y, w;
 							  int id;
@@ -449,25 +451,28 @@ bool Application::UpdateNetwork(float dt)
 							  bs.Read(y);
 							  bs.Read(w);
 
-							  missiles_.push_back(new Missile("missile.png", x, y, w, id, rs.C_String()));
+							  net_projlist.push_back(new Projectile(SPR_PROJECTILE, rs.C_String()));
+							  net_projlist.back()->Init(x, y, w, id);
 		}
 			break;
-		case ID_UPDATEMISSILE:
+		case ID_UPDATEPROJECTILE:
 		{
 								 float x, y, w;
 								 int id;
 								 char deleted;
+								 bool active;
 
 								 bs.Read(id);
 								 bs.Read(deleted);
 
-								 for (MissileList::iterator itr = missiles_.begin(); itr != missiles_.end(); ++itr)
+								 for (vector<Projectile*>::iterator itr = net_projlist.begin(); itr != net_projlist.end(); ++itr)
 								 {
 									 if ((*itr)->GetOwnerID() == id)
 									 {
 										 if (deleted == 1)
 										 {
-											 delete*itr; missiles_.erase(itr);
+											 delete*itr; 
+											 net_projlist.erase(itr);
 										 }
 
 										 else
@@ -480,6 +485,7 @@ bool Application::UpdateNetwork(float dt)
 											 (*itr)->SetVelocityX(x);
 											 bs.Read(y);
 											 (*itr)->SetVelocityY(y);
+
 										 }
 										 break;
 									 }
@@ -493,7 +499,7 @@ bool Application::UpdateNetwork(float dt)
 		rakpeer_->DeallocatePacket(packet);
 	}
 
-	if (RakNet::GetTime() - timer_ > 1000)
+	if (RakNet::GetTime() - timer_ > 500)
 	{
 		timer_ = RakNet::GetTime();
 		RakNet::BitStream bs2;
@@ -522,23 +528,25 @@ bool Application::UpdateNetwork(float dt)
 
 		rakpeer_->Send(&bs2, HIGH_PRIORITY, RELIABLE, 0, UNASSIGNED_SYSTEM_ADDRESS, true);
 
-
-		// Lab 13 Task 11 : send missile update 
-		if (mymissile)
+		//Sending of updated local projectiles to network
+		for (vector<Projectile*>::iterator itr = local_projlist.begin(); itr != local_projlist.end(); itr++)
 		{
-			RakNet::BitStream bs3;
-			unsigned char msgid2 = ID_UPDATEMISSILE;
-			unsigned char deleted = 0;
-			bs3.Write(msgid2);
-			bs3.Write(mymissile->GetOwnerID());
-			bs3.Write(deleted);
-			bs3.Write(mymissile->GetX());
-			bs3.Write(mymissile->GetY());
-			bs3.Write(mymissile->GetW());
-			bs3.Write(mymissile->GetVelocityX());
-			bs3.Write(mymissile->GetVelocityY());
+			if ((*itr)->GetActive())
+			{
+				RakNet::BitStream bs3;
+				unsigned char msgid2 = ID_UPDATEPROJECTILE;
 
-			rakpeer_->Send(&bs3, HIGH_PRIORITY, UNRELIABLE_SEQUENCED, 0, UNASSIGNED_SYSTEM_ADDRESS, true);
+				bs3.Write(msgid2);
+				bs3.Write((*itr)->GetOwnerID());
+				bs3.Write((*itr)->GetX());
+				bs3.Write((*itr)->GetY());
+				bs3.Write((*itr)->GetW());
+				bs3.Write((*itr)->GetVelocityX());
+				bs3.Write((*itr)->GetVelocityY());
+				//bs3.Write((*itr)->GetActive());
+
+				rakpeer_->Send(&bs3, HIGH_PRIORITY, UNRELIABLE_SEQUENCED, 0, UNASSIGNED_SYSTEM_ADDRESS, true);
+			}
 		}
 	}
 	return false;
@@ -561,26 +569,30 @@ void Application::Render()
 		(*itr)->Render();
 	}
 
-	// Lab 13 Task 6 : Render the missile
-	if (mymissile)
-	{
-		mymissile->Render();
-	}
-
 	for (int i = 0; i < explosion_list.size(); ++i)
 	{
 		explosion_list.at(i)->Render();
 	}
 
-	// Lab 13 Task 12 : Render network missiles
-	MissileList::iterator itr2;
-	for (itr2 = missiles_.begin(); itr2 != missiles_.end(); itr2++)
+	//Render Local list projectiles
+	for (vector<Projectile*>::iterator itr = local_projlist.begin(); itr != local_projlist.end(); itr++)
 	{
-		(*itr2)->Render();
+		if ((*itr)->GetActive())
+		{
+			(*itr)->Render();
+		}
+	}
+
+	//Render Network list projectiles
+	for (vector<Projectile*>::iterator itr = net_projlist.begin(); itr != net_projlist.end(); itr++)
+	{
+		if ((*itr)->GetActive())
+		{
+			(*itr)->Render();
+		}
 	}
 	
 	hge_->Gfx_EndScene();
-	
 }
 
 
@@ -765,41 +777,39 @@ void Application::SendCollision(Ship* ship)
 	rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true);
 }
 
-void Application::CreateMissile(float x, float y, float w, int id, string name)
+void Application::CreateProjectile(float x, float y, float w, int id, string name)
 {
-#ifdef NETWORKMISSLE
 	// Lab 13 Task 9b : Implement networked version of createmissile
 	RakNet::BitStream bs;
 	unsigned char msgid;
-	unsigned char deleted = 0;
+	bool active = false;
 
-	if (mymissile)
+	//Loop through list to get inactive projectile
+	for (vector<Projectile*>::iterator itr = local_projlist.begin(); itr != local_projlist.end(); ++itr)
 	{
-		// send update through network to delete this missile 
-		deleted = 1;
-
-		msgid = ID_UPDATEMISSILE; 
-		bs.Write(msgid); 
-		bs.Write(id);
-		bs.Write(deleted); 
-		bs.Write(x); 
-		bs.Write(y); 
-		bs.Write(w);
-
-		rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true);
-
-		// delete existing missile 
-		delete mymissile;
-		mymissile = 0;
+		if ((*itr)->GetActive() == false)
+		{
+			(*itr)->Init(x, y, w, id);
+			active = true;
+			break;
+		}
+	}
+	//Did not get any inactive projectile
+	if (!active)
+	{
+		//Create new projectiles in 10s to use
+		for (int i = 0; i < 10; ++i)
+		{
+			local_projlist.push_back(new Projectile(SPR_PROJECTILE, ShipName));
+		}
+		local_projlist.back()->Init(x, y, w, id);
+		active = true;
 	}
 
-	//	add a new missile based on the following parameter coordinates 
-	mymissile = new Missile("missile.png", x, y, w, id, name);
-
-	//	send network command to add new missile
+	//Add new projectile to network
 	bs.Reset();
 
-	msgid = ID_NEWMISSILE; 
+	msgid = ID_NEWPROJECTILE; 
 	bs.Write(msgid); 
 	bs.Write(id); 
 	bs.Write(ships_.at(0)->GetName().c_str());
@@ -808,12 +818,6 @@ void Application::CreateMissile(float x, float y, float w, int id, string name)
 	bs.Write(w);
 
 	rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true);
-
-
-#else
-	// Lab 13 Task 3 : Implement local version missile creation
-	mymissile = new Missile("missile.png", x, y, w, id);
-#endif
 }
 
 void Application::CreateExplosion(float pos_X, float pos_Y)

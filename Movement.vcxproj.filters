@@ -20,10 +20,10 @@
     <ClCompile Include="ship.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="missile.cpp">
+    <ClCompile Include="explosion.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="explosion.cpp">
+    <ClCompile Include="projectile.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -40,10 +40,10 @@
     <ClInclude Include="ship.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="missile.h">
+    <ClInclude Include="explosion.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="explosion.h">
+    <ClInclude Include="projectile.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

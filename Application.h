@@ -2,7 +2,7 @@
 #define _APPLICATION_H_
 
 #include "ship.h"
-#include "missile.h"
+#include "projectile.h"
 #include "explosion.h"
 
 #include <vector>
@@ -39,9 +39,7 @@ class Application
 	ShipList ships_; //!< List of all the ships in the universe
 	RakPeerInterface* rakpeer_;
 	unsigned int timer_;
-	
-	// Lab 13 Task 1 : add variables for local missle
-	Missile* mymissile;
+		
 	bool have_missile;
 	bool keydown_enter;
 
@@ -51,14 +49,17 @@ class Application
 	HTEXTURE bg_tex_, explosion_tex_;
 
 	// Lab 13 Task 8 : add variables to handle networked missiles
-	typedef std::vector<Missile*> MissileList;
-	MissileList missiles_;
+	//typedef std::vector<Projectile*> ProjectileList;
+	//Projectiles
+	vector<Projectile*>  local_projlist;
+	vector<Projectile*> net_projlist;
 	
+
 	//Explosion effect
 	vector <explosion*> explosion_list;
 	explosion* explosion_efx;
 	float collision_X, collision_Y;
-	hgeAnimation* SA;
+	hgeAnimation* SA_explosion;
 	
 	//Tracking
 	string ShipName;
@@ -74,8 +75,8 @@ class Application
 	bool SendInitialPosition();
 
 	// Lab 13
-	void CreateMissile(float x, float y, float w, int id, string name);
-	bool RemoveMissile( float x, float y, float w, int id );
+	void CreateProjectile(float x, float y, float w, int id, string name);
+	bool RemoveProjectile( float x, float y, float w, int id );
 	void CreateExplosion(float pos_X, float pos_Y);
 
 	void SendCollision( Ship* ship );
