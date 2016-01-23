@@ -20,12 +20,12 @@ using std::string;
 class ProximityMine
 {
 	HTEXTURE tex_; //!< Handle to the sprite's texture
-	std::auto_ptr<hgeSprite> sprite_; //!< The sprite used to display the ship
-	float x_; //!< The x-coordinate of the ship
-	float y_; //!< The y-coordinate of the ship
-	float w_; //!< The angular position of the ship
-	float velocity_x_; //!< The resolved velocity of the ship along the x-axis
-	float velocity_y_; //!< The resolved velocity of the ship along the y-axis
+	std::auto_ptr<hgeSprite> sprite_; //!< The sprite used to display the mine
+	float x_; //!< The x-coordinate of the mine
+	float y_; //!< The y-coordinate of the mine
+	float w_; //!< The angular position of the mine
+	float velocity_x_; //!< The resolved velocity of the mine along the x-axis
+	float velocity_y_; //!< The resolved velocity of the mine along the y-axis
 	hgeRect collidebox;
 	int ownerid;
 	string ownername;

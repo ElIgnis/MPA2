@@ -5,6 +5,7 @@
 #include "projectile.h"
 #include "explosion.h"
 #include "proximitymine.h"
+#include "projectile_powerup.h"
 
 #include <vector>
 #include <hge.h>
@@ -24,7 +25,7 @@ using std::string;
 #define NEW_MINE_DELAY_TIMER 5.f
 
 //! The default angular velocity of the ship when it is in motion
-static const float DEFAULT_ANGULAR_VELOCITY = 3.0f; 
+static const float DEFAULT_ANGULAR_VELOCITY = 3.0f;
 //! The default acceleration of the ship when powered
 static const float DEFAULT_ACCELERATION = 50.0f;
 
@@ -42,7 +43,7 @@ class Application
 	ShipList ships_; //!< List of all the ships in the universe
 	RakPeerInterface* rakpeer_;
 	unsigned int timer_;
-		
+
 	bool keydown_fire;
 	bool keydown_mine;
 
@@ -52,9 +53,9 @@ class Application
 	HTEXTURE bg_tex_, explosion_tex_;
 
 	//Projectiles
-	vector<Projectile*>  local_projlist;
+	vector<Projectile*> local_projlist;
 	vector<Projectile*> net_projlist;
-	
+
 	void CreateProjectile(float x, float y, float w, int id, string name);
 
 	//Proximity Mine
@@ -67,12 +68,17 @@ class Application
 
 	//Explosion effect
 	vector <explosion*> explosion_list;
-	explosion* explosion_efx;
 	float collision_X, collision_Y;
 	hgeAnimation* SA_explosion;
 
 	void CreateExplosion(float pos_X, float pos_Y);
-	
+
+	//Power up
+	vector <Projectile_PowerUp*> network_proj_powerup_list;
+	void CreatePowerUp(float pos_X, float pos_Y);
+
+	//Scoring
+
 	//Player Tracking
 	string ShipName;
 	string Attacker;
@@ -86,7 +92,7 @@ class Application
 	void ProcessWelcomePackage();
 	bool SendInitialPosition();
 
-	void SendCollision( Ship* ship );
+	void SendCollision(Ship* ship);
 public:
 	Application();
 	~Application() throw();
@@ -98,6 +104,7 @@ public:
 	void UpdateProjectiles(float dt);
 	void UpdateMines(float dt);
 	void UpdateExplosions(float dt);
+	void UpdatePowerups(float dt);
 	bool UpdatePackets(float dt);
 	void Render();
 };

@@ -12,7 +12,6 @@ Projectile::Projectile(char* filename, string ownerName) :
 	, collision_Y(0.f)
 	, ownername("")
 	, damage(20)
-	, additional_damage(0)
 	, selfDamage(false)
 	, active(false)
 	, activeTimer(0.f)
@@ -142,11 +141,7 @@ string Projectile::GetOwnerName(void)
 
 float Projectile::GetProjectileDmg(void)
 {
-	return (damage + additional_damage);
-}
-void Projectile::SetProjectilePower(int level)
-{
-	additional_damage = level * 10;
+	return (damage);
 }
 
 bool Projectile::GetSelfDamage(void)

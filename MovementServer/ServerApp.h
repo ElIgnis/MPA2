@@ -5,6 +5,13 @@
 #include <map>
 #include <RakString.h>
 #include <string>
+#include <time.h>
+#include <stdlib.h>
+
+class HGE;
+
+#define NEW_POWERUP_DELAY_TIMER 10.f
+#define FRAMETIME 0.01f
 
 class RakPeerInterface;
 
@@ -39,6 +46,11 @@ class ServerApp
 	void SendDisconnectionNotification(SystemAddress& addr);
 	void ProcessInitialPosition( SystemAddress& addr, float x_, float y_, int type_, string name_);
 	void UpdatePosition( SystemAddress& addr, float x_, float y_ );
+
+	HGE* hge_;
+	float pwrUp_SpawnTimer;
+	float x, y;
+	int sendCount;
 
 public:
 	ServerApp();

@@ -28,6 +28,7 @@ Ship::Ship(int type, float locx_, float locy_)
 , id(0)
 , collidetimer(0)
 , health(100)
+, additionalDamage(0)
 #ifdef INTERPOLATEMOVEMENT
 , server_w_(0)
 , client_w_(0)
@@ -274,7 +275,6 @@ hgeRect* Ship::GetBoundingBox()
 	return &collidebox;
 }
 
-
 bool Ship::HasCollided( Ship *ship )
 {
 	sprite_->GetBoundingBox( x_, y_, &collidebox);
@@ -290,4 +290,19 @@ void Ship::SetHealth(int newHealth)
 int Ship::GetHealth(void)
 {
 	return health;
+}
+
+bool Ship::IncreasePower(int newAddDmg)
+{
+	if (powerLevel < 3)
+	{
+		++powerLevel;
+		this->additionalDamage = newAddDmg;
+		return true;
+	}
+	return false;
+}
+int Ship::GetPower(void)
+{
+	return additionalDamage;
 }

@@ -88,6 +88,7 @@ bool Application::Init()
 
 		//Initialise ships
 		ships_.push_back(new Ship(rand() % 4 + 1, rand() % 500 + 100, rand() % 400 + 100));
+		std::cout << "Please enter your name: ";
 		std::cin >> ShipName;
 		rs.Set(ShipName.c_str());
 		ships_.at(0)->SetName(ShipName.c_str());
@@ -143,6 +144,7 @@ bool Application::Update()
 	UpdateProjectiles(timedelta);
 	UpdateMines(timedelta);
 	UpdateExplosions(timedelta);
+	UpdatePowerups(timedelta);
 
 	if (UpdatePackets(timedelta))
 		return true;
@@ -340,6 +342,30 @@ void Application::UpdateExplosions(float dt)
 	for (int i = 0; i < explosion_list.size(); ++i)
 	{
 		explosion_list.at(i)->Update(dt);
+	}
+}
+void Application::UpdatePowerups(float dt)
+{
+	//Update powerups
+	for (vector<Projectile_PowerUp*>::iterator itr = network_proj_powerup_list.begin(); itr != network_proj_powerup_list.end(); itr++)
+	{
+		//Adds damage with increment
+		if ((*itr)->Update(ships_, dt))
+		{
+			if (ships_.at(0)->IncreasePower(ships_.at(0)->GetPower() + INCREMENT))
+			{
+				std::cout << "Received power upgrade" << std::endl;
+			}
+			else
+			{
+				std::cout << "Power upgrade maxed, converted to score" << std::endl;
+			}
+
+			//delete power up upon collision
+			delete *itr;
+			network_proj_powerup_list.erase(itr);
+			break;
+		}
 	}
 }
 
@@ -614,6 +640,15 @@ bool Application::UpdatePackets(float dt)
 									}
 		}
 			break;
+		case ID_NEWPWRUP_PROJDMG:
+		{
+									float x, y;
+									bs.Read(x);
+									bs.Read(y);
+									network_proj_powerup_list.push_back(new Projectile_PowerUp(SPR_PROJ_PWRUP));
+									network_proj_powerup_list.back()->Init(x, y);
+		}
+			break;
 		default:
 			std::cout << "Unhandled Message Identifier: " << (int)msgid << std::endl;
 		}
@@ -750,6 +785,15 @@ void Application::Render()
 		}
 	}
 	
+	//Render Powerups
+	for (vector<Projectile_PowerUp*>::iterator itr = network_proj_powerup_list.begin(); itr != network_proj_powerup_list.end(); itr++)
+	{
+		if ((*itr)->GetActive())
+		{
+			(*itr)->Render();
+		}
+	}
+
 	hge_->Gfx_EndScene();
 }
 

@@ -20,16 +20,16 @@ using std::string;
 class Projectile
 {
 	HTEXTURE tex_; //!< Handle to the sprite's texture
-	std::auto_ptr<hgeSprite> sprite_; //!< The sprite used to display the ship
-	float x_; //!< The x-coordinate of the ship
-	float y_; //!< The y-coordinate of the ship
+	std::auto_ptr<hgeSprite> sprite_; //!< The sprite used to display the projectile
+	float x_; //!< The x-coordinate of the projectile
+	float y_; //!< The y-coordinate of the projectile
 	float w_; //!< The angular position of the ship
-	float velocity_x_; //!< The resolved velocity of the ship along the x-axis
-	float velocity_y_; //!< The resolved velocity of the ship along the y-axis
+	float velocity_x_; //!< The resolved velocity of the projectile along the x-axis
+	float velocity_y_; //!< The resolved velocity of the projectile along the y-axis
 	hgeRect collidebox;
 	int ownerid;
 	string ownername;
-	int damage, additional_damage;
+	int damage;
 	float collision_X, collision_Y;
 	bool selfDamage;
 	bool active;

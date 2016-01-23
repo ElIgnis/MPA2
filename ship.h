@@ -36,6 +36,8 @@ class Ship
 
 	float oldx, oldy;	// for reset back to previous location if collision detected
 	int health;
+	int additionalDamage;
+	int powerLevel;
 
 	// Lab Task 2 : add for interpolation
 #ifdef INTERPOLATEMOVEMENT
@@ -66,6 +68,8 @@ public:
 	string GetName(void);
 	void SetHealth(int newHealth);
 	int GetHealth(void);
+	bool IncreasePower(int newAddDmg);
+	int GetPower(void);
 	
 	hgeRect* GetBoundingBox();
 	bool HasCollided( Ship *ship );
