@@ -230,7 +230,6 @@ void Ship::Update(float timedelta)
 
 void Ship::Render()
 {
-
 	sprite_->RenderEx(x_, y_, w_);
 
 	font_->printf(x_+5, y_+5, HGETEXT_LEFT, "%s",

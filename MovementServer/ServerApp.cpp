@@ -78,26 +78,35 @@ void ServerApp::Loop()
 			break;
 
 		case ID_COLLIDE:
-			{
-				bs.ResetReadPointer();
-				rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE, 0, packet->systemAddress, true);
-			}
+		{
+						   bs.ResetReadPointer();
+						   rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE, 0, packet->systemAddress, true);
+		}
 			break;
-
-		// Lab 13 Task 14 : new cases on server side to handle projectile
 		case ID_NEWPROJECTILE:
-			{
-				bs.ResetReadPointer();
-				rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE, 0, packet->systemAddress, true);
-			}
-			break; 
-		case ID_UPDATEPROJECTILE:
-			{
-				bs.ResetReadPointer();
-				rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE, 0, packet->systemAddress, true);
-			}
+		{
+								 bs.ResetReadPointer();
+								 rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE, 0, packet->systemAddress, true);
+		}
 			break;
-
+		case ID_UPDATEPROJECTILE:
+		{
+									bs.ResetReadPointer();
+									rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE, 0, packet->systemAddress, true);
+		}
+			break;
+		case ID_NEWPROXIMITYMINE:
+		{
+									bs.ResetReadPointer();
+									rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE, 0, packet->systemAddress, true);
+		}
+			break;
+		case ID_UPDATEPROXIMITYMINE:
+		{
+									   bs.ResetReadPointer();
+									   rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE, 0, packet->systemAddress, true);
+		}
+			break;
 		default:
 			std::cout << "Unhandled Message Identifier: " << (int)msgid << std::endl;
 		}

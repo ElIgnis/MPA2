@@ -35,9 +35,12 @@ Application::Application()
 : hge_(hgeCreate(HGE_VERSION))
 , rakpeer_(RakNetworkFactory::GetRakPeerInterface())
 , timer_(0)
-, keydown_enter(false)
+, keydown_fire(false)
+, keydown_mine(false)
 , collision_X(0.f)
 , collision_Y(0.f)
+, NewMine(false)
+, NewMineTimer(0.f)
 {
 }
 
@@ -86,6 +89,7 @@ bool Application::Init()
 		//Initialise ships
 		ships_.push_back(new Ship(rand() % 4 + 1, rand() % 500 + 100, rand() % 400 + 100));
 		std::cin >> ShipName;
+		rs.Set(ShipName.c_str());
 		ships_.at(0)->SetName(ShipName.c_str());
 
 		//Initialise 50 explosion effects
@@ -98,6 +102,12 @@ bool Application::Init()
 		for (int i = 0; i < 50; ++i)
 		{
 			local_projlist.push_back(new Projectile(SPR_PROJECTILE, ShipName));
+		}
+
+		//Initialise 5 mines
+		for (int i = 0; i < 5; ++i)
+		{
+			local_minelist.push_back(new ProximityMine(SPR_MINE, ShipName));
 		}
 
 		//Connect to server
@@ -129,9 +139,12 @@ bool Application::Update()
 	if (UpdateKeypress())
 		return true;
 
-	UpdateLocal(timedelta);
+	UpdateShips(timedelta);
+	UpdateProjectiles(timedelta);
+	UpdateMines(timedelta);
+	UpdateExplosions(timedelta);
 
-	if (UpdateNetwork(timedelta))
+	if (UpdatePackets(timedelta))
 		return true;
 
 	return false;
@@ -146,6 +159,7 @@ bool Application::UpdateKeypress()
 
 	ships_.at(0)->SetAngularVelocity(0.0f);
 
+	//Movement keys
 	if (hge_->Input_GetKeyState(HGEK_LEFT))
 	{
 		ships_.at(0)->SetAngularVelocity(ships_.at(0)->GetAngularVelocity() - DEFAULT_ANGULAR_VELOCITY);
@@ -166,26 +180,44 @@ bool Application::UpdateKeypress()
 		ships_.at(0)->Accelerate(-DEFAULT_ACCELERATION, timedelta);
 	}
 
-	// Lab 13 Task 4 : Add a key to shoot missiles
-	if (hge_->Input_GetKeyState(HGEK_SPACE))
+	//Projectile firing
+	if (hge_->Input_GetKeyState(HGEK_J))
 	{
-		if (!keydown_enter)
+		if (!keydown_fire)
 		{
 			CreateProjectile(ships_.at(0)->GetX(), ships_.at(0)->GetY(), ships_.at(0)->GetW(), ships_.at(0)->GetID(), ships_.at(0)->GetName());
-			keydown_enter = true;
+			keydown_fire = true;
 		}
 	}
 	else
 	{
-		if (keydown_enter)
+		if (keydown_fire)
 		{
-			keydown_enter = false;
+			keydown_fire = false;
+		}
+	}
+
+	//Set Proximity mines
+	if (hge_->Input_GetKeyState(HGEK_K))
+	{
+		if (!keydown_mine)
+		{
+			CreateMine(ships_.at(0)->GetX(), ships_.at(0)->GetY(), ships_.at(0)->GetW(), ships_.at(0)->GetID(), ships_.at(0)->GetServerVelocityX(), ships_.at(0)->GetServerVelocityY(), ships_.at(0)->GetName());
+			keydown_mine = true;
+		}
+	}
+	else
+	{
+		if (keydown_mine)
+		{
+			keydown_mine = false;
 		}
 	}
 
 	return false;
 }
-void Application::UpdateLocal(float dt)
+
+void Application::UpdateShips(float dt)
 {
 	//Update ships collision
 	for (ShipList::iterator ship = ships_.begin(); ship != ships_.end(); ship++)
@@ -196,7 +228,9 @@ void Application::UpdateLocal(float dt)
 		if ((*ship) == ships_.at(0))
 			checkCollisions((*ship));
 	}
-
+}
+void Application::UpdateProjectiles(float dt)
+{
 	//Update local projectile list
 	for (vector<Projectile*>::iterator itr = local_projlist.begin(); itr != local_projlist.end(); itr++)
 	{
@@ -211,11 +245,6 @@ void Application::UpdateLocal(float dt)
 				ships_.at(0)->SetHealth(ships_.at(0)->GetHealth() - (*itr)->GetProjectileDmg());
 				std::cout << ships_.at(0)->GetHealth() << std::endl;
 			}
-
-			//delete projectile upon collision
-			
-			//delete *itr;
-			//local_projlist.erase(itr);
 			break;
 		}
 	}
@@ -234,21 +263,87 @@ void Application::UpdateLocal(float dt)
 				ships_.at(0)->SetHealth(ships_.at(0)->GetHealth() - (*itr)->GetProjectileDmg());
 				std::cout << ships_.at(0)->GetHealth() << std::endl;
 			}
-			
 			//delete projectile upon collision
-			//delete *itr;
-			//net_projlist.erase(itr);
+			delete *itr;
+			net_projlist.erase(itr);
+			break;
+		}
+	}
+}
+void Application::UpdateMines(float dt)
+{
+	int maxActiveMines = 0;
+
+	//New mine creation
+	for (vector<ProximityMine*>::iterator itr = local_minelist.begin(); itr != local_minelist.end(); ++itr)
+	{
+		if ((*itr)->GetActive() == true)
+		{
+			++maxActiveMines;
+		}
+	}
+
+	//Start timer for creation of new mines
+	if (maxActiveMines == local_minelist.size())
+	{
+		NewMineTimer += dt;
+	}
+
+	if (NewMineTimer > NEW_MINE_DELAY_TIMER)
+	{
+		NewMine = true;
+	}
+
+	//Update local mines list
+	for (vector<ProximityMine*>::iterator itr = local_minelist.begin(); itr != local_minelist.end(); itr++)
+	{
+		if ((*itr)->Update(ships_, dt))
+		{
+			CreateExplosion((*itr)->GetCollisionX(), (*itr)->GetCollisionY());
+
+			//Log and damage
+			if ((*itr)->GetSelfDamage() == true)
+			{
+				std::cout << "Self inflicted damage of: " << (*itr)->GetProximityMineDmg() << std::endl;
+				ships_.at(0)->SetHealth(ships_.at(0)->GetHealth() - (*itr)->GetProximityMineDmg());
+				std::cout << ships_.at(0)->GetHealth() << std::endl;
+			}
 			break;
 		}
 	}
 
+	//Update network mines list
+	for (vector<ProximityMine*>::iterator itr = net_minelist.begin(); itr != net_minelist.end(); itr++)
+	{
+		if ((*itr)->Update(ships_, dt))
+		{
+			CreateExplosion((*itr)->GetCollisionX(), (*itr)->GetCollisionY());
+
+			//Log and damage
+			if ((*itr)->GetSelfDamage() == false)
+			{
+				std::cout << "Received " << (*itr)->GetProximityMineDmg() << " from: " << (*itr)->GetOwnerName() << std::endl;
+				ships_.at(0)->SetHealth(ships_.at(0)->GetHealth() - (*itr)->GetProximityMineDmg());
+				std::cout << ships_.at(0)->GetHealth() << std::endl;
+
+			}
+			//delete mine upon collision
+			delete *itr;
+			net_minelist.erase(itr);
+			break;
+		}
+	}
+}
+void Application::UpdateExplosions(float dt)
+{
 	//Update explosion effects
 	for (int i = 0; i < explosion_list.size(); ++i)
 	{
 		explosion_list.at(i)->Update(dt);
 	}
 }
-bool Application::UpdateNetwork(float dt)
+
+bool Application::UpdatePackets(float dt)
 {
 	if (Packet* packet = rakpeer_->Receive())
 	{
@@ -436,9 +531,6 @@ bool Application::UpdateNetwork(float dt)
 						   }
 		}
 			break;
-
-
-		// Lab 13 Task 10 : new cases to handle missile on application side
 		case ID_NEWPROJECTILE:
 		{
 							  float x, y, w;
@@ -450,7 +542,7 @@ bool Application::UpdateNetwork(float dt)
 							  bs.Read(x);
 							  bs.Read(y);
 							  bs.Read(w);
-
+							  
 							  net_projlist.push_back(new Projectile(SPR_PROJECTILE, rs.C_String()));
 							  net_projlist.back()->Init(x, y, w, id);
 		}
@@ -459,47 +551,76 @@ bool Application::UpdateNetwork(float dt)
 		{
 								 float x, y, w;
 								 int id;
-								 char deleted;
 								 bool active;
 
 								 bs.Read(id);
-								 bs.Read(deleted);
 
 								 for (vector<Projectile*>::iterator itr = net_projlist.begin(); itr != net_projlist.end(); ++itr)
 								 {
 									 if ((*itr)->GetOwnerID() == id)
 									 {
-										 if (deleted == 1)
-										 {
-											 delete*itr; 
-											 net_projlist.erase(itr);
-										 }
-
-										 else
-										 {
-											 bs.Read(x);
-											 bs.Read(y);
-											 bs.Read(w);
-											 (*itr)->UpdateLoc(x, y, w);
-											 bs.Read(x);
-											 (*itr)->SetVelocityX(x);
-											 bs.Read(y);
-											 (*itr)->SetVelocityY(y);
-
-										 }
+										 bs.Read(x);
+										 bs.Read(y);
+										 bs.Read(w);
+										 (*itr)->UpdateLoc(x, y, w);
+										 bs.Read(x);
+										 (*itr)->SetVelocityX(x);
+										 bs.Read(y);
+										 (*itr)->SetVelocityY(y);
 										 break;
 									 }
 								 }
 		}
 			break;
+		case ID_NEWPROXIMITYMINE:
+		{
+								 float x, y, w, vel_x, vel_y;
+								 int id;
+								 string owner;
 
+								 bs.Read(id);
+								 bs.Read(rs);
+								 bs.Read(x);
+								 bs.Read(y);
+								 bs.Read(w);
+								 bs.Read(vel_x);
+								 bs.Read(vel_y);
+
+								 net_minelist.push_back(new ProximityMine(SPR_MINE, rs.C_String()));
+								 net_minelist.back()->Init(x, y, w, vel_x, vel_y, id);
+		}
+			break;
+		case ID_UPDATEPROXIMITYMINE:
+		{
+									float x, y, w;
+									int id;
+									bool active;
+
+									bs.Read(id);
+									for (vector<ProximityMine*>::iterator itr = net_minelist.begin(); itr != net_minelist.end(); ++itr)
+									{
+										if ((*itr)->GetOwnerID() == id)
+										{
+											bs.Read(x);
+											bs.Read(y);
+											bs.Read(w);
+											(*itr)->UpdateLoc(x, y, w);
+											bs.Read(x);
+											(*itr)->SetVelocityX(x);
+											bs.Read(y);
+											(*itr)->SetVelocityY(y);
+											break;
+										}
+									}
+		}
+			break;
 		default:
 			std::cout << "Unhandled Message Identifier: " << (int)msgid << std::endl;
 		}
 		rakpeer_->DeallocatePacket(packet);
 	}
 
-	if (RakNet::GetTime() - timer_ > 500)
+	if (RakNet::GetTime() - timer_ > 250)
 	{
 		timer_ = RakNet::GetTime();
 		RakNet::BitStream bs2;
@@ -528,26 +649,45 @@ bool Application::UpdateNetwork(float dt)
 
 		rakpeer_->Send(&bs2, HIGH_PRIORITY, RELIABLE, 0, UNASSIGNED_SYSTEM_ADDRESS, true);
 
-		//Sending of updated local projectiles to network
-		for (vector<Projectile*>::iterator itr = local_projlist.begin(); itr != local_projlist.end(); itr++)
-		{
-			if ((*itr)->GetActive())
-			{
-				RakNet::BitStream bs3;
-				unsigned char msgid2 = ID_UPDATEPROJECTILE;
+		////Sending of updated local projectiles to network
+		//for (vector<Projectile*>::iterator itr = local_projlist.begin(); itr != local_projlist.end(); itr++)
+		//{
+		//	if ((*itr)->GetActive())
+		//	{
+		//		RakNet::BitStream bs_projectile;
+		//		unsigned char msgid2 = ID_UPDATEPROJECTILE;
 
-				bs3.Write(msgid2);
-				bs3.Write((*itr)->GetOwnerID());
-				bs3.Write((*itr)->GetX());
-				bs3.Write((*itr)->GetY());
-				bs3.Write((*itr)->GetW());
-				bs3.Write((*itr)->GetVelocityX());
-				bs3.Write((*itr)->GetVelocityY());
-				//bs3.Write((*itr)->GetActive());
+		//		bs_projectile.Write(msgid2);
+		//		bs_projectile.Write((*itr)->GetOwnerID());
+		//		bs_projectile.Write((*itr)->GetX());
+		//		bs_projectile.Write((*itr)->GetY());
+		//		bs_projectile.Write((*itr)->GetW());
+		//		bs_projectile.Write((*itr)->GetVelocityX());
+		//		bs_projectile.Write((*itr)->GetVelocityY());
 
-				rakpeer_->Send(&bs3, HIGH_PRIORITY, UNRELIABLE_SEQUENCED, 0, UNASSIGNED_SYSTEM_ADDRESS, true);
-			}
-		}
+		//		rakpeer_->Send(&bs_projectile, HIGH_PRIORITY, UNRELIABLE_SEQUENCED, 0, UNASSIGNED_SYSTEM_ADDRESS, true);
+		//	}
+		//}
+		
+		////Sending of updated local mines to network
+		//for (vector<ProximityMine*>::iterator itr = local_minelist.begin(); itr != local_minelist.end(); itr++)
+		//{
+		//	if ((*itr)->GetActive())
+		//	{
+		//		RakNet::BitStream bs_mine;
+		//		unsigned char msgid2 = ID_UPDATEPROXIMITYMINE;
+
+		//		bs_mine.Write(msgid2);
+		//		bs_mine.Write((*itr)->GetOwnerID());
+		//		bs_mine.Write((*itr)->GetX());
+		//		bs_mine.Write((*itr)->GetY());
+		//		bs_mine.Write((*itr)->GetW());
+		//		bs_mine.Write((*itr)->GetVelocityX());
+		//		bs_mine.Write((*itr)->GetVelocityY());
+
+		//		rakpeer_->Send(&bs_mine, HIGH_PRIORITY, UNRELIABLE_SEQUENCED, 0, UNASSIGNED_SYSTEM_ADDRESS, true);
+		//	}
+		//}
 	}
 	return false;
 }
@@ -591,10 +731,27 @@ void Application::Render()
 			(*itr)->Render();
 		}
 	}
+
+	//Render Local list mines
+	for (vector<ProximityMine*>::iterator itr = local_minelist.begin(); itr != local_minelist.end(); itr++)
+	{
+		if ((*itr)->GetActive())
+		{
+			(*itr)->Render();
+		}
+	}
+
+	//Render Network list mines
+	for (vector<ProximityMine*>::iterator itr = net_minelist.begin(); itr != net_minelist.end(); itr++)
+	{
+		if ((*itr)->GetActive())
+		{
+			(*itr)->Render();
+		}
+	}
 	
 	hge_->Gfx_EndScene();
 }
-
 
 /**
 * Main game loop
@@ -621,11 +778,31 @@ void Application::Shutdown()
 {
 	hge_->System_Shutdown();
 	hge_->Release();
-	for (int i = 0; i < 10; ++i)
+	for (int i = 0; i < explosion_list.size(); ++i)
 	{
 		delete explosion_list.at(i);
 		explosion_list.at(i) = NULL;
 	}
+	//for (int i = 0; i < local_projlist.size(); ++i)
+	//{
+	//	delete local_projlist.at(i);
+	//	local_projlist.at(i) = NULL;
+	//}
+	//for (int i = 0; i < net_projlist.size(); ++i)
+	//{
+	//	delete net_projlist.at(i);
+	//	net_projlist.at(i) = NULL;
+	//}
+	//for (int i = 0; i < local_minelist.size(); ++i)
+	//{
+	//	delete local_minelist.at(i);
+	//	local_minelist.at(i) = NULL;
+	//}
+	//for (int i = 0; i < net_minelist.size(); ++i)
+	//{
+	//	delete net_minelist.at(i);
+	//	net_minelist.at(i) = NULL;
+	//}
 }
 
 /**
@@ -779,7 +956,6 @@ void Application::SendCollision(Ship* ship)
 
 void Application::CreateProjectile(float x, float y, float w, int id, string name)
 {
-	// Lab 13 Task 9b : Implement networked version of createmissile
 	RakNet::BitStream bs;
 	unsigned char msgid;
 	bool active = false;
@@ -803,7 +979,6 @@ void Application::CreateProjectile(float x, float y, float w, int id, string nam
 			local_projlist.push_back(new Projectile(SPR_PROJECTILE, ShipName));
 		}
 		local_projlist.back()->Init(x, y, w, id);
-		active = true;
 	}
 
 	//Add new projectile to network
@@ -811,13 +986,58 @@ void Application::CreateProjectile(float x, float y, float w, int id, string nam
 
 	msgid = ID_NEWPROJECTILE; 
 	bs.Write(msgid); 
-	bs.Write(id); 
-	bs.Write(ships_.at(0)->GetName().c_str());
+	bs.Write(id);
+	bs.Write(rs);
 	bs.Write(x); 
 	bs.Write(y); 
 	bs.Write(w);
 
 	rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true);
+}
+
+void Application::CreateMine(float x, float y, float w, int id, float vel_X, float vel_Y, string name)
+{
+	RakNet::BitStream bs;
+	unsigned char msgid;
+	bool created = false;
+
+	//Loop through list to get inactive mine
+	for (vector<ProximityMine*>::iterator itr = local_minelist.begin(); itr != local_minelist.end(); ++itr)
+	{
+		if ((*itr)->GetActive() == false)
+		{
+			(*itr)->Init(x, y, w, vel_X, vel_Y, id);
+			created = true;
+			break;
+		}
+	}
+	//If all mines are used up, only after delay can create new mine
+	if (!created && NewMine)
+	{
+		created = true;
+		local_minelist.push_back(new ProximityMine(SPR_MINE, ShipName));
+		local_minelist.back()->Init(x, y, w, vel_X, vel_Y, id);
+		NewMine = false;
+		NewMineTimer = 0.f;
+	}
+
+	//Add new mine to network
+	if (created)
+	{
+		bs.Reset();
+
+		msgid = ID_NEWPROXIMITYMINE;
+		bs.Write(msgid);
+		bs.Write(id);
+		bs.Write(rs);
+		bs.Write(x);
+		bs.Write(y);
+		bs.Write(w);
+		bs.Write(vel_X);
+		bs.Write(vel_Y);
+
+		rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true);
+	}
 }
 
 void Application::CreateExplosion(float pos_X, float pos_Y)
