@@ -16,6 +16,10 @@ using std::string;
 
 #define INCREMENT 5
 #define SPR_PROJ_PWRUP "Images/PowerUp.png"
+#define SPR_PROJ_PWRUP_LVLONE "Images/PowerLevel0.png"
+#define SPR_PROJ_PWRUP_LVLTWO "Images/PowerLevel1.png"
+#define SPR_PROJ_PWRUP_LVLTHREE "Images/PowerLevel2.png"
+#define SPR_PROJ_PWRUP_LVLMAX "Images/PowerLevelMax.png"
 
 class Projectile_PowerUp
 {

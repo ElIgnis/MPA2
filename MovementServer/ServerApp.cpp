@@ -112,6 +112,10 @@ void ServerApp::Loop()
 									   rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE, 0, packet->systemAddress, true);
 		}
 			break;
+		case ID_KILL_CREDIT:
+			bs.ResetReadPointer();
+			rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE, 0, packet->systemAddress, true);
+			break;
 		default:
 			std::cout << "Unhandled Message Identifier: " << (int)msgid << std::endl;
 		}
@@ -140,8 +144,8 @@ void ServerApp::Loop()
 
 		if (sendCount == newID)
 		{
-			x = rand() % 700 + 100;
-			y = rand() % 500 + 100;
+			x = rand() % 600 + 200;
+			y = rand() % 400 + 200;
 			sendCount = 0;
 			pwrUp_SpawnTimer = 0.f;
 		}

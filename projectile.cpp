@@ -73,7 +73,7 @@ bool Projectile::Update(std::vector<Ship*> &shiplist, float timedelta)
 
 		for (std::vector<Ship*>::iterator thisship = shiplist.begin(); thisship != shiplist.end(); thisship++)
 		{
-			if (HasCollided((*(*thisship))))
+			if (HasCollided((*(*thisship))) && (*thisship)->GetAlive() )
 			{
 				if ((*thisship)->GetID() == ownerid)
 				{
@@ -139,9 +139,14 @@ string Projectile::GetOwnerName(void)
 	return ownername;
 }
 
+void Projectile::SetProjectilePower(int damage)
+{
+	this->damage += damage * 5;
+}
+
 float Projectile::GetProjectileDmg(void)
 {
-	return (damage);
+	return damage;
 }
 
 bool Projectile::GetSelfDamage(void)

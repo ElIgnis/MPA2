@@ -16,6 +16,8 @@ using std::string;
 
 #define DELAY_DURATION 3.f
 #define SPR_MINE "Images/proxmine.png"
+#define SPR_MINE_READY "Images/Mine_Usable.png"
+#define SPR_MINE_UNREADY "Images/Mine_Unusable.png"
 
 class ProximityMine
 {

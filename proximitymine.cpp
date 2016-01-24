@@ -70,7 +70,7 @@ bool ProximityMine::Update(std::vector<Ship*> &shiplist, float timedelta)
 
 	for (std::vector<Ship*>::iterator thisship = shiplist.begin(); thisship != shiplist.end(); thisship++)
 	{
-		if (active == true && HasCollided((*(*thisship))))
+		if (active == true && HasCollided((*(*thisship))) && (*thisship)->GetAlive())
 		{
 			if ((*thisship)->GetID() == ownerid)
 			{

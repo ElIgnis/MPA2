@@ -5,12 +5,16 @@
 #include <hgerect.h>
 #include <memory>
 #include <string>
+#include <hgeanim.h>
 
 class hgeSprite;
 class hgeFont;
 
 using std::string;
 
+#define RESPAWN_DELAY 3.f
+#define SPR_RESPAWN "Images/respawn.png"
+#define RESPAWN_IMAGE_SIZE 256
 #define INTERPOLATEMOVEMENT 
 
 /**
@@ -22,10 +26,11 @@ using std::string;
 
 class Ship
 {
-	HTEXTURE tex_; //!< Handle to the sprite's texture
+	HTEXTURE tex_, respawn_tex_; //!< Handle to the sprite's texture
 	std::auto_ptr<hgeSprite> sprite_; //!< The sprite used to display the ship
 	std::auto_ptr<hgeFont> font_;
 	hgeRect collidebox;
+	hgeAnimation* SA_respawn;
 
 	std::string shipName_;
 	float x_; //!< The x-coordinate of the ship
@@ -36,8 +41,10 @@ class Ship
 
 	float oldx, oldy;	// for reset back to previous location if collision detected
 	int health;
-	int additionalDamage;
+	bool alive;
+	bool updateSprite;
 	int powerLevel;
+	float respawnTimer;
 
 	// Lab Task 2 : add for interpolation
 #ifdef INTERPOLATEMOVEMENT
@@ -55,7 +62,6 @@ class Ship
 	unsigned int id;
 	int type_;
 	float angular_velocity;
-
 	unsigned int collidetimer;
 public:
 
@@ -68,7 +74,9 @@ public:
 	string GetName(void);
 	void SetHealth(int newHealth);
 	int GetHealth(void);
-	bool IncreasePower(int newAddDmg);
+	bool GetAlive(void);
+	void SetAlive(bool newAlive);
+	bool IncreasePower(void);
 	int GetPower(void);
 	
 	hgeRect* GetBoundingBox();

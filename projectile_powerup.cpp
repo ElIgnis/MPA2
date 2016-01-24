@@ -42,10 +42,23 @@ bool Projectile_PowerUp::Update(std::vector<Ship*> &shiplist, float timedelta)
 
 	for (std::vector<Ship*>::iterator thisship = shiplist.begin(); thisship != shiplist.end(); thisship++)
 	{
+		//Only update self
 		if (HasCollided((*(*thisship))))
 		{
 			collision_X = x_;
 			collision_Y = y_;
+			if ((*thisship)->GetID() == shiplist.at(0)->GetID())
+			{
+				if ((*thisship)->IncreasePower())
+				{
+					std::cout << "Received power upgrade" << std::endl;
+				}
+				else
+				{
+					std::cout << "Power upgrade maxed, converted to score" << std::endl;
+				}
+			}
+			
 			active = false;
 			return true;
 		}

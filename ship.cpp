@@ -8,7 +8,6 @@
 #define SHIPTYPE1 "Images/Ship_Type1.png"
 #define SHIPTYPE2 "Images/Ship_Type2.png"
 #define SHIPTYPE3 "Images/Ship_Type3.png"
-#define SHIPTYPE4 "Images/Ship_Type4.png"
 
 /**
 * Ship Constructor
@@ -28,7 +27,10 @@ Ship::Ship(int type, float locx_, float locy_)
 , id(0)
 , collidetimer(0)
 , health(100)
-, additionalDamage(0)
+, powerLevel(0)
+, alive(true)
+, respawnTimer(0.f)
+, updateSprite(false)
 #ifdef INTERPOLATEMOVEMENT
 , server_w_(0)
 , client_w_(0)
@@ -59,22 +61,22 @@ Ship::Ship(int type, float locx_, float locy_)
 			tex_ = hge->Texture_Load(SHIPTYPE3);
 			type_ = 3;
 			break;
-		case 4:
-			tex_ = hge->Texture_Load(SHIPTYPE4);
-			type_ = 4;
-			break;
 		default:
 			tex_ = hge->Texture_Load(SHIPTYPE1);
 			type_ = 1;
 			break;
 	}
-
+	respawn_tex_ = hge->Texture_Load(SPR_RESPAWN);
 	hge->Release();
+	
 	sprite_.reset(new hgeSprite(tex_, 0, 0, 64, 64));
+	sprite_->SetHotSpot(32, 32);
 
 	font_.reset(new hgeFont("font1.fnt"));
 	font_->SetScale( 0.5 );
-	sprite_->SetHotSpot(32,32);
+
+	SA_respawn = new hgeAnimation(respawn_tex_, 35, 25, 0, 0, RESPAWN_IMAGE_SIZE, RESPAWN_IMAGE_SIZE);
+	SA_respawn->SetHotSpot(128, 128);
 }
 
 
@@ -103,121 +105,151 @@ Ship::~Ship()
 
 void Ship::Update(float timedelta)
 {
-	HGE* hge = hgeCreate(HGE_VERSION);
-	float pi = 3.141592654f*2;
+	if (alive == false)
+	{
+		respawnTimer += timedelta;
+
+		if (respawnTimer > RESPAWN_DELAY)
+		{
+			alive = true;
+			respawnTimer = 0.f;
+			updateSprite = true;
+			SA_respawn->Play();
+			x_ = rand() % 500 + 100;
+			y_ = rand() % 400 + 100;
+			health = 100;
+		}
+	}
+
+	if (updateSprite)
+	{
+		SA_respawn->Update(timedelta);
+
+		if (SA_respawn->GetFrame() == 34)
+		{
+			updateSprite = false;
+		}
+	}
+
+	if (alive)
+	{
+
+		HGE* hge = hgeCreate(HGE_VERSION);
+		float pi = 3.141592654f * 2;
 
 #ifdef INTERPOLATEMOVEMENT
-	server_w_ += angular_velocity * timedelta;
+		server_w_ += angular_velocity * timedelta;
 
-	if (server_w_ > pi)
-		server_w_ -= pi;
+		if (server_w_ > pi)
+			server_w_ -= pi;
 
-	if (server_w_ < 0.0f)
-		server_w_ += pi;
+		if (server_w_ < 0.0f)
+			server_w_ += pi;
 
-	client_w_ += angular_velocity * timedelta;
+		client_w_ += angular_velocity * timedelta;
 
-	if (client_w_ > pi)
-		client_w_ -= pi;
+		if (client_w_ > pi)
+			client_w_ -= pi;
 
-	if (client_w_ < 0.0f)
-		client_w_ += pi;
+		if (client_w_ < 0.0f)
+			client_w_ += pi;
 
-	w_ = ratio_ * server_w_ + (1 - ratio_) * client_w_;
+		w_ = ratio_ * server_w_ + (1 - ratio_) * client_w_;
 #else
 
-	w_ += angular_velocity * timedelta;
+		w_ += angular_velocity * timedelta;
 
 #endif
 
-	if (w_ > pi)
-		w_ -= pi;
+		if (w_ > pi)
+			w_ -= pi;
 
-	if (w_ < 0.0f)
-		w_ += pi;
+		if (w_ < 0.0f)
+			w_ += pi;
 
-	// store old coords
-	oldx = x_; 
-	oldy = y_;
+		// store old coords
+		oldx = x_;
+		oldy = y_;
 
-	// Lab 7 Task 2 : In order to change to interpolation-based, comment these out
+		// Lab 7 Task 2 : In order to change to interpolation-based, comment these out
 #ifndef INTERPOLATEMOVEMENT
-	x_ += velocity_x_ * timedelta;
-	y_ += velocity_y_ * timedelta;
+		x_ += velocity_x_ * timedelta;
+		y_ += velocity_y_ * timedelta;
 #endif
 
-	float screenwidth = static_cast<float>(hge->System_GetState(HGE_SCREENWIDTH));
-	float screenheight = static_cast<float>(hge->System_GetState(HGE_SCREENHEIGHT));
-	float spritewidth = sprite_->GetWidth();
-	float spriteheight = sprite_->GetHeight();
+		float screenwidth = static_cast<float>(hge->System_GetState(HGE_SCREENWIDTH));
+		float screenheight = static_cast<float>(hge->System_GetState(HGE_SCREENHEIGHT));
+		float spritewidth = sprite_->GetWidth();
+		float spriteheight = sprite_->GetHeight();
 
-	// Lab 7 Task 2 : Add new motion changes for Interpolation
+		// Lab 7 Task 2 : Add new motion changes for Interpolation
 #ifdef INTERPOLATEMOVEMENT
-	server_x_ += server_velx_ * timedelta;
-	server_y_ += server_vely_ * timedelta;
+		server_x_ += server_velx_ * timedelta;
+		server_y_ += server_vely_ * timedelta;
 
-	if (server_x_ < -spritewidth/2)
-		server_x_ += screenwidth + spritewidth;
-	else if (server_x_ > screenwidth + spritewidth/2)
-		server_x_ -= screenwidth + spritewidth;
+		if (server_x_ < -spritewidth / 2)
+			server_x_ += screenwidth + spritewidth;
+		else if (server_x_ > screenwidth + spritewidth / 2)
+			server_x_ -= screenwidth + spritewidth;
 
-	if (server_y_ < -spriteheight/2)
-		server_y_ += screenheight + spriteheight;
-	else if (server_y_ > screenheight + spriteheight/2)
-		server_y_ -= screenheight + spriteheight;
-	
+		if (server_y_ < -spriteheight / 2)
+			server_y_ += screenheight + spriteheight;
+		else if (server_y_ > screenheight + spriteheight / 2)
+			server_y_ -= screenheight + spriteheight;
 
-	client_x_ += velocity_x_ * timedelta;
-	client_y_ += velocity_y_ * timedelta;
 
-	if (client_x_ < -spritewidth/2)
-		client_x_ += screenwidth + spritewidth;
-	else if (client_x_ > screenwidth + spritewidth/2)
-		client_x_ -= screenwidth + spritewidth;
+		client_x_ += velocity_x_ * timedelta;
+		client_y_ += velocity_y_ * timedelta;
 
-	if (client_y_ < -spriteheight/2)
-		client_y_ += screenheight + spriteheight;
-	else if (client_y_ > screenheight + spriteheight/2)
-		client_y_ -= screenheight + spriteheight;
+		if (client_x_ < -spritewidth / 2)
+			client_x_ += screenwidth + spritewidth;
+		else if (client_x_ > screenwidth + spritewidth / 2)
+			client_x_ -= screenwidth + spritewidth;
 
-	if ( (server_x_ < -spritewidth/2 && client_x_ > screenwidth + spritewidth/2) ||
-		(server_x_ > screenwidth + spritewidth/2 && client_x_ < -spritewidth/2 ) )
-	{
-		x_ = server_x_;
-	}
-	else
-	{
-		x_ = ratio_ * server_x_ + (1 - ratio_) * client_x_;
-	}
+		if (client_y_ < -spriteheight / 2)
+			client_y_ += screenheight + spriteheight;
+		else if (client_y_ > screenheight + spriteheight / 2)
+			client_y_ -= screenheight + spriteheight;
 
-	if ( (server_y_ < -spriteheight/2 && client_y_ > screenheight + spriteheight/2) ||
-		(server_y_ > screenheight + spriteheight/2 && client_y_ < -spriteheight/2 ) )
-	{
-		y_ = server_y_;
-	}
-	else
-	{
-		y_ = ratio_ * server_y_ + (1 - ratio_) * client_y_;
-	}
+		if ((server_x_ < -spritewidth / 2 && client_x_ > screenwidth + spritewidth / 2) ||
+			(server_x_ > screenwidth + spritewidth / 2 && client_x_ < -spritewidth / 2))
+		{
+			x_ = server_x_;
+		}
+		else
+		{
+			x_ = ratio_ * server_x_ + (1 - ratio_) * client_x_;
+		}
 
-	if (ratio_ < 1)
-	{
-		// interpolating ratio step
-		ratio_ += timedelta *4;
-		if (ratio_ > 1)
-			ratio_ = 1;
-	}
+		if ((server_y_ < -spriteheight / 2 && client_y_ > screenheight + spriteheight / 2) ||
+			(server_y_ > screenheight + spriteheight / 2 && client_y_ < -spriteheight / 2))
+		{
+			y_ = server_y_;
+		}
+		else
+		{
+			y_ = ratio_ * server_y_ + (1 - ratio_) * client_y_;
+		}
+
+		if (ratio_ < 1)
+		{
+			// interpolating ratio step
+			ratio_ += timedelta * 4;
+			if (ratio_ > 1)
+				ratio_ = 1;
+		}
 #endif
 
-	if (x_ < -spritewidth/2)
-		x_ += screenwidth + spritewidth;
-	else if (x_ > screenwidth + spritewidth/2)
-		x_ -= screenwidth + spritewidth;
+		if (x_ < -spritewidth / 2)
+			x_ += screenwidth + spritewidth;
+		else if (x_ > screenwidth + spritewidth / 2)
+			x_ -= screenwidth + spritewidth;
 
-	if (y_ < -spriteheight/2)
-		y_ += screenheight + spriteheight;
-	else if (y_ > screenheight + spriteheight/2)
-		y_ -= screenheight + spriteheight;
+		if (y_ < -spriteheight / 2)
+			y_ += screenheight + spriteheight;
+		else if (y_ > screenheight + spriteheight / 2)
+			y_ -= screenheight + spriteheight;
+	}
 }
 
 
@@ -231,10 +263,17 @@ void Ship::Update(float timedelta)
 
 void Ship::Render()
 {
-	sprite_->RenderEx(x_, y_, w_);
+	if (alive)
+	{
+		sprite_->RenderEx(x_, y_, w_);
 
-	font_->printf(x_+5, y_+5, HGETEXT_LEFT, "%s",
-		shipName_.c_str());
+		font_->printf(x_ + 5, y_ + 5, HGETEXT_LEFT, "%s",
+			shipName_.c_str());
+	}
+	if (updateSprite)
+	{
+		SA_respawn->Render(x_, y_);
+	}
 }
 
 /**
@@ -277,9 +316,13 @@ hgeRect* Ship::GetBoundingBox()
 
 bool Ship::HasCollided( Ship *ship )
 {
-	sprite_->GetBoundingBox( x_, y_, &collidebox);
+	if (alive)
+	{
+		sprite_->GetBoundingBox(x_, y_, &collidebox);
 
-	return collidebox.Intersect( ship->GetBoundingBox() );
+		return collidebox.Intersect(ship->GetBoundingBox());
+	}
+	return false;
 }
 
 void Ship::SetHealth(int newHealth)
@@ -292,17 +335,27 @@ int Ship::GetHealth(void)
 	return health;
 }
 
-bool Ship::IncreasePower(int newAddDmg)
+void Ship::SetAlive(bool newAlive)
+{
+	this->alive = newAlive;
+}
+
+bool Ship::GetAlive(void)
+{
+	return alive;
+}
+
+bool Ship::IncreasePower(void)
 {
 	if (powerLevel < 3)
 	{
 		++powerLevel;
-		this->additionalDamage = newAddDmg;
+		
 		return true;
 	}
 	return false;
 }
 int Ship::GetPower(void)
 {
-	return additionalDamage;
+	return powerLevel;
 }

@@ -12,7 +12,6 @@
 #include <hgeSprite.h>
 #include <string>
 #include <RakString.h>
-#include <hgeanim.h>
 
 class hgeSprite;
 class hgeFont;
@@ -21,8 +20,6 @@ class RakPeerInterface;
 
 using std::vector;
 using std::string;
-
-#define NEW_MINE_DELAY_TIMER 5.f
 
 //! The default angular velocity of the ship when it is in motion
 static const float DEFAULT_ANGULAR_VELOCITY = 3.0f;
@@ -48,28 +45,29 @@ class Application
 	bool keydown_mine;
 
 	//Sprites
-	std::auto_ptr<hgeSprite> background_;
+	std::auto_ptr<hgeSprite> background_Left, background_Right;
+	std::auto_ptr<hgeSprite> cursor_;
 	std::auto_ptr<hgeSprite> explosion_;
-	HTEXTURE bg_tex_, explosion_tex_;
+	HTEXTURE bg_tex_, explosion_tex_, cursor_tex;
+	bool showCursor;
+	float Left_X;
+	float Right_X;
 
 	//Projectiles
 	vector<Projectile*> local_projlist;
 	vector<Projectile*> net_projlist;
 
-	void CreateProjectile(float x, float y, float w, int id, string name);
+	void CreateProjectile(float x, float y, float w, int id, int powerlevel, string name);
 
 	//Proximity Mine
 	vector<ProximityMine*> local_minelist;
 	vector<ProximityMine*> net_minelist;
-	bool NewMine;
-	float NewMineTimer;
 
 	void CreateMine(float x, float y, float w, int id, float vel_X, float vel_Y, string name);
 
 	//Explosion effect
 	vector <explosion*> explosion_list;
 	float collision_X, collision_Y;
-	hgeAnimation* SA_explosion;
 
 	void CreateExplosion(float pos_X, float pos_Y);
 
@@ -78,6 +76,20 @@ class Application
 	void CreatePowerUp(float pos_X, float pos_Y);
 
 	//Scoring
+	int kills, deaths;
+	bool sendKillCredits;
+
+	//UI
+	HTEXTURE tex_pwrlvl1, tex_pwrlvl2, tex_pwrlvl3, tex_pwrlvlmax, tex_mine_unready, tex_mine_ready;
+	std::auto_ptr<hgeSprite> pwrlvl1_;
+	std::auto_ptr<hgeSprite> pwrlvl2_;
+	std::auto_ptr<hgeSprite> pwrlvl3_;
+	std::auto_ptr<hgeSprite> pwrlvlmax_;
+	std::auto_ptr<hgeSprite> mineready_;
+	std::auto_ptr<hgeSprite> mineunready_;
+	std::auto_ptr<hgeFont> font_;
+	std::string playerHealth, playerKills, playerDeaths;
+
 
 	//Player Tracking
 	string ShipName;
@@ -107,6 +119,7 @@ public:
 	void UpdatePowerups(float dt);
 	bool UpdatePackets(float dt);
 	void Render();
+	void RenderUI(void);
 };
 
 #endif

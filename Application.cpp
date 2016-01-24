@@ -10,6 +10,7 @@
 #include <string>
 #include <iostream>
 #include <fstream>
+#include <hgeFont.h>
 
 // Lab 13 Task 9a : Uncomment the macro NETWORKPROJECTILE
 #define NETWORKMISSLE
@@ -39,8 +40,12 @@ Application::Application()
 , keydown_mine(false)
 , collision_X(0.f)
 , collision_Y(0.f)
-, NewMine(false)
-, NewMineTimer(0.f)
+, showCursor(true)
+, Left_X(0)
+, Right_X(800)
+, kills(0)
+, deaths(0)
+, sendKillCredits(false)
 {
 }
 
@@ -52,6 +57,7 @@ Application::Application()
 
 Application::~Application() throw()
 {
+	font_.release();
 	Shutdown();
 	rakpeer_->Shutdown(100);
 	RakNetworkFactory::DestroyRakPeerInterface(rakpeer_);
@@ -84,14 +90,36 @@ bool Application::Init()
 	{
 		//Load Images
 		bg_tex_ = hge_->Texture_Load("Images/background.png");
-		background_.reset(new hgeSprite(bg_tex_, 0, 0, 800, 600));
+		background_Left.reset(new hgeSprite(bg_tex_, 0, 0, 800, 600));
+		background_Right.reset(new hgeSprite(bg_tex_, 0, 0, 800, 600));
+
+		//Cursor
+		cursor_tex = hge_->Texture_Load("Images/HUD/cursor.png");
+		cursor_.reset(new hgeSprite(cursor_tex, 0, 0, 9, 17));
 
 		//Initialise ships
-		ships_.push_back(new Ship(rand() % 4 + 1, rand() % 500 + 100, rand() % 400 + 100));
+		ships_.push_back(new Ship(rand() % 3 + 1, rand() % 500 + 100, rand() % 400 + 100));
 		std::cout << "Please enter your name: ";
 		std::cin >> ShipName;
 		rs.Set(ShipName.c_str());
 		ships_.at(0)->SetName(ShipName.c_str());
+
+		//Weapon icons
+		tex_pwrlvl1 = hge_->Texture_Load(SPR_PROJ_PWRUP_LVLONE);
+		tex_pwrlvl2 = hge_->Texture_Load(SPR_PROJ_PWRUP_LVLTWO);
+		tex_pwrlvl3 = hge_->Texture_Load(SPR_PROJ_PWRUP_LVLTHREE);
+		tex_pwrlvlmax = hge_->Texture_Load(SPR_PROJ_PWRUP_LVLMAX);
+
+		tex_mine_unready = hge_->Texture_Load(SPR_MINE_UNREADY);
+		tex_mine_ready = hge_->Texture_Load(SPR_MINE_READY);
+
+		pwrlvl1_.reset(new hgeSprite(tex_pwrlvl1, 0, 0, 64, 64));
+		pwrlvl2_.reset(new hgeSprite(tex_pwrlvl2, 0, 0, 64, 64));
+		pwrlvl3_.reset(new hgeSprite(tex_pwrlvl3, 0, 0, 64, 64));
+		pwrlvlmax_.reset(new hgeSprite(tex_pwrlvlmax, 0, 0, 64, 64));
+
+		mineunready_.reset(new hgeSprite(tex_mine_unready, 0, 0, 64, 64));
+		mineready_.reset(new hgeSprite(tex_mine_ready, 0, 0, 64, 64));
 
 		//Initialise 50 explosion effects
 		for (int i = 0; i < 50; ++i)
@@ -111,12 +139,17 @@ bool Application::Init()
 			local_minelist.push_back(new ProximityMine(SPR_MINE, ShipName));
 		}
 
+		//Font
+		font_.reset(new hgeFont("font1.fnt"));
+		font_->SetScale(1.0);
+
 		//Connect to server
 		if (rakpeer_->Startup(1, 30, &SocketDescriptor(), 1))
 		{
 			rakpeer_->SetOccasionalPing(true);
 			return rakpeer_->Connect(serverip.c_str(), 1691, 0, 0);
 		}
+		
 	}
 	return false;
 }
@@ -187,7 +220,7 @@ bool Application::UpdateKeypress()
 	{
 		if (!keydown_fire)
 		{
-			CreateProjectile(ships_.at(0)->GetX(), ships_.at(0)->GetY(), ships_.at(0)->GetW(), ships_.at(0)->GetID(), ships_.at(0)->GetName());
+			CreateProjectile(ships_.at(0)->GetX(), ships_.at(0)->GetY(), ships_.at(0)->GetW(), ships_.at(0)->GetID(), ships_.at(0)->GetPower(), ships_.at(0)->GetName());
 			keydown_fire = true;
 		}
 	}
@@ -216,6 +249,26 @@ bool Application::UpdateKeypress()
 		}
 	}
 
+	Left_X -= 20 * timedelta;
+	if (Left_X < -800)
+	{
+		Left_X = 800;
+	}
+	if (Left_X > 800)
+	{
+		Left_X = -800;
+	}
+
+	Right_X -= 20 * timedelta;
+	if (Right_X > 800)
+	{
+		Right_X = -800;
+	}
+	if (Right_X < -800)
+	{
+		Right_X = 800;
+	}
+	
 	return false;
 }
 
@@ -224,11 +277,11 @@ void Application::UpdateShips(float dt)
 	//Update ships collision
 	for (ShipList::iterator ship = ships_.begin(); ship != ships_.end(); ship++)
 	{
-		(*ship)->Update(dt);
+			(*ship)->Update(dt);
 
-		//collisions
-		if ((*ship) == ships_.at(0))
-			checkCollisions((*ship));
+			//collisions
+			if ((*ship) == ships_.at(0))
+				checkCollisions((*ship));
 	}
 }
 void Application::UpdateProjectiles(float dt)
@@ -246,6 +299,13 @@ void Application::UpdateProjectiles(float dt)
 				std::cout << "Self inflicted damage of: " << (*itr)->GetProjectileDmg() << std::endl;
 				ships_.at(0)->SetHealth(ships_.at(0)->GetHealth() - (*itr)->GetProjectileDmg());
 				std::cout << ships_.at(0)->GetHealth() << std::endl;
+
+				//Set alive to false when HP is <= 0
+				if (ships_.at(0)->GetHealth() <= 0 && ships_.at(0)->GetAlive())
+				{
+					ships_.at(0)->SetAlive(false);
+					++deaths;
+				}
 			}
 			break;
 		}
@@ -264,6 +324,14 @@ void Application::UpdateProjectiles(float dt)
 				std::cout << "Received " << (*itr)->GetProjectileDmg() << " from: " << (*itr)->GetOwnerName() << std::endl;
 				ships_.at(0)->SetHealth(ships_.at(0)->GetHealth() - (*itr)->GetProjectileDmg());
 				std::cout << ships_.at(0)->GetHealth() << std::endl;
+
+				//Set alive to false when HP is <= 0
+				if (ships_.at(0)->GetHealth() <= 0 && ships_.at(0)->GetAlive())
+				{
+					ships_.at(0)->SetAlive(false);
+					++deaths;
+					sendKillCredits = true;
+				}
 			}
 			//delete projectile upon collision
 			delete *itr;
@@ -274,27 +342,6 @@ void Application::UpdateProjectiles(float dt)
 }
 void Application::UpdateMines(float dt)
 {
-	int maxActiveMines = 0;
-
-	//New mine creation
-	for (vector<ProximityMine*>::iterator itr = local_minelist.begin(); itr != local_minelist.end(); ++itr)
-	{
-		if ((*itr)->GetActive() == true)
-		{
-			++maxActiveMines;
-		}
-	}
-
-	//Start timer for creation of new mines
-	if (maxActiveMines == local_minelist.size())
-	{
-		NewMineTimer += dt;
-	}
-
-	if (NewMineTimer > NEW_MINE_DELAY_TIMER)
-	{
-		NewMine = true;
-	}
 
 	//Update local mines list
 	for (vector<ProximityMine*>::iterator itr = local_minelist.begin(); itr != local_minelist.end(); itr++)
@@ -309,6 +356,13 @@ void Application::UpdateMines(float dt)
 				std::cout << "Self inflicted damage of: " << (*itr)->GetProximityMineDmg() << std::endl;
 				ships_.at(0)->SetHealth(ships_.at(0)->GetHealth() - (*itr)->GetProximityMineDmg());
 				std::cout << ships_.at(0)->GetHealth() << std::endl;
+
+				//Set alive to false when HP is <= 0
+				if (ships_.at(0)->GetHealth() <= 0 && ships_.at(0)->GetAlive())
+				{
+					ships_.at(0)->SetAlive(false);
+					++deaths;
+				}
 			}
 			break;
 		}
@@ -328,6 +382,13 @@ void Application::UpdateMines(float dt)
 				ships_.at(0)->SetHealth(ships_.at(0)->GetHealth() - (*itr)->GetProximityMineDmg());
 				std::cout << ships_.at(0)->GetHealth() << std::endl;
 
+				//Set alive to false when HP is <= 0
+				if (ships_.at(0)->GetHealth() <= 0 && ships_.at(0)->GetAlive())
+				{
+					ships_.at(0)->SetAlive(false);
+					++deaths;
+					sendKillCredits = true;
+				}
 			}
 			//delete mine upon collision
 			delete *itr;
@@ -352,15 +413,6 @@ void Application::UpdatePowerups(float dt)
 		//Adds damage with increment
 		if ((*itr)->Update(ships_, dt))
 		{
-			if (ships_.at(0)->IncreasePower(ships_.at(0)->GetPower() + INCREMENT))
-			{
-				std::cout << "Received power upgrade" << std::endl;
-			}
-			else
-			{
-				std::cout << "Power upgrade maxed, converted to score" << std::endl;
-			}
-
 			//delete power up upon collision
 			delete *itr;
 			network_proj_powerup_list.erase(itr);
@@ -482,6 +534,7 @@ bool Application::UpdatePackets(float dt)
 							unsigned int shipid;
 							float temp;
 							float x, y, w;
+							int health;
 							bs.Read(shipid);
 							for (ShipList::iterator itr = ships_.begin(); itr != ships_.end(); ++itr)
 							{
@@ -492,8 +545,15 @@ bool Application::UpdatePackets(float dt)
 									bs.Read(x);
 									bs.Read(y);
 									bs.Read(w);
-
 									(*itr)->SetServerLocation(x, y, w);
+
+									bs.Read(health);
+									(*itr)->SetHealth(health);
+
+									if ((*itr)->GetHealth() <= 0)
+									{
+										(*itr)->SetAlive(false);
+									}
 
 									bs.Read(temp);
 									(*itr)->SetServerVelocityX(temp);
@@ -560,7 +620,7 @@ bool Application::UpdatePackets(float dt)
 		case ID_NEWPROJECTILE:
 		{
 							  float x, y, w;
-							  int id;
+							  int id, powerlevel;
 							  string owner;
 
 							  bs.Read(id);
@@ -568,9 +628,11 @@ bool Application::UpdatePackets(float dt)
 							  bs.Read(x);
 							  bs.Read(y);
 							  bs.Read(w);
+							  bs.Read(powerlevel);
 							  
 							  net_projlist.push_back(new Projectile(SPR_PROJECTILE, rs.C_String()));
 							  net_projlist.back()->Init(x, y, w, id);
+							  net_projlist.back()->SetProjectilePower(powerlevel);
 		}
 			break;
 		case ID_UPDATEPROJECTILE:
@@ -649,6 +711,9 @@ bool Application::UpdatePackets(float dt)
 									network_proj_powerup_list.back()->Init(x, y);
 		}
 			break;
+		case ID_KILL_CREDIT:
+			++kills;
+			break;
 		default:
 			std::cout << "Unhandled Message Identifier: " << (int)msgid << std::endl;
 		}
@@ -667,6 +732,7 @@ bool Application::UpdatePackets(float dt)
 		bs2.Write(ships_.at(0)->GetServerX());
 		bs2.Write(ships_.at(0)->GetServerY());
 		bs2.Write(ships_.at(0)->GetServerW());
+		bs2.Write(ships_.at(0)->GetHealth());
 		bs2.Write(ships_.at(0)->GetServerVelocityX());
 		bs2.Write(ships_.at(0)->GetServerVelocityY());
 		bs2.Write(ships_.at(0)->GetAngularVelocity());
@@ -724,6 +790,17 @@ bool Application::UpdatePackets(float dt)
 		//	}
 		//}
 	}
+
+	if (sendKillCredits)
+	{
+		sendKillCredits = false;
+
+		RakNet::BitStream bs;
+		unsigned char msgid = ID_KILL_CREDIT;
+		bs.Write(msgid);
+
+		rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE, 0, UNASSIGNED_SYSTEM_ADDRESS, true);
+	}
 	return false;
 }
 
@@ -736,17 +813,24 @@ void Application::Render()
 {
 	hge_->Gfx_BeginScene();
 	hge_->Gfx_Clear(0);
-	background_->RenderEx(0, 0, 0);
+	background_Left->Render(Left_X, 0);
+	background_Right->Render(Right_X, 0);
 
 	ShipList::iterator itr;
 	for (itr = ships_.begin(); itr != ships_.end(); itr++)
 	{
-		(*itr)->Render();
+		if ((*itr)->GetAlive())
+		{
+			(*itr)->Render();
+		}
 	}
 
-	for (int i = 0; i < explosion_list.size(); ++i)
+	for (vector<explosion*>::iterator itr = explosion_list.begin(); itr != explosion_list.end(); itr++)
 	{
-		explosion_list.at(i)->Render();
+		if ((*itr)->GetActive())
+		{
+			(*itr)->Render();
+		}
 	}
 
 	//Render Local list projectiles
@@ -794,7 +878,68 @@ void Application::Render()
 		}
 	}
 
+	//Cursor
+	//if (showCursor)
+	//{
+	//	float x, y;
+	//	hge_->Input_GetMousePos(&x, &y);
+	//	cursor_->Render(x, y);
+	//}
+	RenderUI();
+	
 	hge_->Gfx_EndScene();
+}
+
+void Application::RenderUI(void)
+{
+	//Health
+	font_->printf(20, 550, HGETEXT_LEFT, "%s%d", "Player Health: ", ships_.at(0)->GetHealth());
+
+	//Projectile power
+	switch (ships_.at(0)->GetPower())
+	{
+	case 0:
+		pwrlvl1_->Render(450, 530);
+		break;
+	case 1:
+		pwrlvl2_->Render(460, 530);
+		break;
+	case 2:
+		pwrlvl3_->Render(460, 530);
+		break;
+	case 3:
+		pwrlvlmax_->Render(460, 530);
+		break;
+	default:
+		break;
+	}
+
+	font_->printf(300, 550, HGETEXT_LEFT, "%s", "Power Level:");
+
+	int UsableMines = 0;
+
+	//Mine state
+	for (vector<ProximityMine*>::iterator itr = local_minelist.begin(); itr != local_minelist.end(); ++itr)
+	{
+		if ((*itr)->GetActive() == false)
+		{
+			++UsableMines;
+		}
+	}
+	if (UsableMines > 0)
+	{
+		mineready_->Render(620, 530);
+	}
+	else
+	{
+		mineunready_->Render(620, 530);
+	}
+
+	font_->printf(550, 550, HGETEXT_LEFT, "%s        x%d", "Mines: ", UsableMines);
+
+	//KD
+	font_->printf(20, 500, HGETEXT_LEFT, "%s%d", "Kills: ", kills);
+	font_->printf(150, 500, HGETEXT_LEFT, "%s%d", "Deaths: ", deaths);
 }
 
 /**
@@ -998,7 +1143,7 @@ void Application::SendCollision(Ship* ship)
 	rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true);
 }
 
-void Application::CreateProjectile(float x, float y, float w, int id, string name)
+void Application::CreateProjectile(float x, float y, float w, int id, int powerlevel, string name)
 {
 	RakNet::BitStream bs;
 	unsigned char msgid;
@@ -1035,6 +1180,7 @@ void Application::CreateProjectile(float x, float y, float w, int id, string nam
 	bs.Write(x); 
 	bs.Write(y); 
 	bs.Write(w);
+	bs.Write(powerlevel);
 
 	rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, UNASSIGNED_SYSTEM_ADDRESS, true);
 }
@@ -1055,16 +1201,6 @@ void Application::CreateMine(float x, float y, float w, int id, float vel_X, flo
 			break;
 		}
 	}
-	//If all mines are used up, only after delay can create new mine
-	if (!created && NewMine)
-	{
-		created = true;
-		local_minelist.push_back(new ProximityMine(SPR_MINE, ShipName));
-		local_minelist.back()->Init(x, y, w, vel_X, vel_Y, id);
-		NewMine = false;
-		NewMineTimer = 0.f;
-	}
-
 	//Add new mine to network
 	if (created)
 	{

@@ -47,7 +47,7 @@ public:
 	float GetCollisionY(void);
 	string GetOwnerName(void);
 	float GetProjectileDmg(void);
-	void SetProjectilePower(int level);
+	void SetProjectilePower(int damage);
 	bool GetSelfDamage(void);
 	bool GetActive(void);
 
