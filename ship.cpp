@@ -31,6 +31,7 @@ Ship::Ship(int type, float locx_, float locy_)
 , alive(true)
 , respawnTimer(0.f)
 , updateSprite(false)
+, updatePos(false)
 #ifdef INTERPOLATEMOVEMENT
 , server_w_(0)
 , client_w_(0)
@@ -73,7 +74,7 @@ Ship::Ship(int type, float locx_, float locy_)
 	sprite_->SetHotSpot(32, 32);
 
 	font_.reset(new hgeFont("font1.fnt"));
-	font_->SetScale( 0.5 );
+	font_->SetScale(0.75);
 
 	SA_respawn = new hgeAnimation(respawn_tex_, 35, 25, 0, 0, RESPAWN_IMAGE_SIZE, RESPAWN_IMAGE_SIZE);
 	SA_respawn->SetHotSpot(128, 128);
@@ -105,35 +106,6 @@ Ship::~Ship()
 
 void Ship::Update(float timedelta)
 {
-	if (alive == false)
-	{
-		respawnTimer += timedelta;
-
-		if (respawnTimer > RESPAWN_DELAY)
-		{
-			alive = true;
-			respawnTimer = 0.f;
-			updateSprite = true;
-			SA_respawn->Play();
-			x_ = rand() % 500 + 100;
-			y_ = rand() % 400 + 100;
-			health = 100;
-		}
-	}
-
-	if (updateSprite)
-	{
-		SA_respawn->Update(timedelta);
-
-		if (SA_respawn->GetFrame() == 34)
-		{
-			updateSprite = false;
-		}
-	}
-
-	if (alive)
-	{
-
 		HGE* hge = hgeCreate(HGE_VERSION);
 		float pi = 3.141592654f * 2;
 
@@ -181,6 +153,7 @@ void Ship::Update(float timedelta)
 		float screenheight = static_cast<float>(hge->System_GetState(HGE_SCREENHEIGHT));
 		float spritewidth = sprite_->GetWidth();
 		float spriteheight = sprite_->GetHeight();
+
 
 		// Lab 7 Task 2 : Add new motion changes for Interpolation
 #ifdef INTERPOLATEMOVEMENT
@@ -249,6 +222,30 @@ void Ship::Update(float timedelta)
 			y_ += screenheight + spriteheight;
 		else if (y_ > screenheight + spriteheight / 2)
 			y_ -= screenheight + spriteheight;
+	
+	if (health <= 0)
+	{
+		respawnTimer += timedelta;
+
+		if (respawnTimer > RESPAWN_DELAY)
+		{
+			alive = true;
+			respawnTimer = 0.f;
+			updateSprite = true;
+			SA_respawn->Play();
+
+			health = 100;
+		}
+	}
+
+	if (updateSprite)
+	{
+		SA_respawn->Update(timedelta);
+
+		if (SA_respawn->GetFrame() == 34)
+		{
+			updateSprite = false;
+		}
 	}
 }
 

@@ -6,6 +6,7 @@
 #include <memory>
 #include <string>
 #include <hgeanim.h>
+#include <iostream>
 
 class hgeSprite;
 class hgeFont;
@@ -43,6 +44,7 @@ class Ship
 	int health;
 	bool alive;
 	bool updateSprite;
+	bool updatePos;
 	int powerLevel;
 	float respawnTimer;
 
@@ -78,6 +80,7 @@ public:
 	void SetAlive(bool newAlive);
 	bool IncreasePower(void);
 	int GetPower(void);
+	bool GetRespawn(void);
 	
 	hgeRect* GetBoundingBox();
 	bool HasCollided( Ship *ship );
@@ -136,6 +139,15 @@ public:
 		server_x_ = x; 
 		server_y_ = y;
 		server_w_ = w;
+	}
+
+	void UpdateRespawnLocation(void) {
+		server_x_ = rand() % 500 + 100;
+		server_y_ = rand() % 400 + 100;
+		client_x_ = server_x_;
+		client_y_ = server_y_;
+		x_ = server_x_;
+		y_ = server_y_;
 	}
 
 	void SetServerVelocityX( float velocity ) { server_velx_ = velocity; }

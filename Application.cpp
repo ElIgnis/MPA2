@@ -195,57 +195,60 @@ bool Application::UpdateKeypress()
 	ships_.at(0)->SetAngularVelocity(0.0f);
 
 	//Movement keys
-	if (hge_->Input_GetKeyState(HGEK_LEFT))
+	if (ships_.at(0)->GetAlive())
 	{
-		ships_.at(0)->SetAngularVelocity(ships_.at(0)->GetAngularVelocity() - DEFAULT_ANGULAR_VELOCITY);
-	}
-
-	if (hge_->Input_GetKeyState(HGEK_RIGHT))
-	{
-		ships_.at(0)->SetAngularVelocity(ships_.at(0)->GetAngularVelocity() + DEFAULT_ANGULAR_VELOCITY);
-	}
-
-	if (hge_->Input_GetKeyState(HGEK_UP))
-	{
-		ships_.at(0)->Accelerate(DEFAULT_ACCELERATION, timedelta);
-	}
-
-	if (hge_->Input_GetKeyState(HGEK_DOWN))
-	{
-		ships_.at(0)->Accelerate(-DEFAULT_ACCELERATION, timedelta);
-	}
-
-	//Projectile firing
-	if (hge_->Input_GetKeyState(HGEK_J))
-	{
-		if (!keydown_fire)
+		if (hge_->Input_GetKeyState(HGEK_LEFT))
 		{
-			CreateProjectile(ships_.at(0)->GetX(), ships_.at(0)->GetY(), ships_.at(0)->GetW(), ships_.at(0)->GetID(), ships_.at(0)->GetPower(), ships_.at(0)->GetName());
-			keydown_fire = true;
+			ships_.at(0)->SetAngularVelocity(ships_.at(0)->GetAngularVelocity() - DEFAULT_ANGULAR_VELOCITY);
 		}
-	}
-	else
-	{
-		if (keydown_fire)
-		{
-			keydown_fire = false;
-		}
-	}
 
-	//Set Proximity mines
-	if (hge_->Input_GetKeyState(HGEK_K))
-	{
-		if (!keydown_mine)
+		if (hge_->Input_GetKeyState(HGEK_RIGHT))
 		{
-			CreateMine(ships_.at(0)->GetX(), ships_.at(0)->GetY(), ships_.at(0)->GetW(), ships_.at(0)->GetID(), ships_.at(0)->GetServerVelocityX(), ships_.at(0)->GetServerVelocityY(), ships_.at(0)->GetName());
-			keydown_mine = true;
+			ships_.at(0)->SetAngularVelocity(ships_.at(0)->GetAngularVelocity() + DEFAULT_ANGULAR_VELOCITY);
 		}
-	}
-	else
-	{
-		if (keydown_mine)
+
+		if (hge_->Input_GetKeyState(HGEK_UP))
 		{
-			keydown_mine = false;
+			ships_.at(0)->Accelerate(DEFAULT_ACCELERATION, timedelta);
+		}
+
+		if (hge_->Input_GetKeyState(HGEK_DOWN))
+		{
+			ships_.at(0)->Accelerate(-DEFAULT_ACCELERATION, timedelta);
+		}
+
+		//Projectile firing
+		if (hge_->Input_GetKeyState(HGEK_J))
+		{
+			if (!keydown_fire)
+			{
+				CreateProjectile(ships_.at(0)->GetX(), ships_.at(0)->GetY(), ships_.at(0)->GetW(), ships_.at(0)->GetID(), ships_.at(0)->GetPower(), ships_.at(0)->GetName());
+				keydown_fire = true;
+			}
+		}
+		else
+		{
+			if (keydown_fire)
+			{
+				keydown_fire = false;
+			}
+		}
+
+		//Set Proximity mines
+		if (hge_->Input_GetKeyState(HGEK_K))
+		{
+			if (!keydown_mine)
+			{
+				CreateMine(ships_.at(0)->GetX(), ships_.at(0)->GetY(), ships_.at(0)->GetW(), ships_.at(0)->GetID(), ships_.at(0)->GetServerVelocityX(), ships_.at(0)->GetServerVelocityY(), ships_.at(0)->GetName());
+				keydown_mine = true;
+			}
+		}
+		else
+		{
+			if (keydown_mine)
+			{
+				keydown_mine = false;
+			}
 		}
 	}
 
@@ -304,6 +307,7 @@ void Application::UpdateProjectiles(float dt)
 				if (ships_.at(0)->GetHealth() <= 0 && ships_.at(0)->GetAlive())
 				{
 					ships_.at(0)->SetAlive(false);
+					ships_.at(0)->UpdateRespawnLocation();
 					++deaths;
 				}
 			}
@@ -329,6 +333,7 @@ void Application::UpdateProjectiles(float dt)
 				if (ships_.at(0)->GetHealth() <= 0 && ships_.at(0)->GetAlive())
 				{
 					ships_.at(0)->SetAlive(false);
+					ships_.at(0)->UpdateRespawnLocation();
 					++deaths;
 					sendKillCredits = true;
 				}
@@ -342,7 +347,6 @@ void Application::UpdateProjectiles(float dt)
 }
 void Application::UpdateMines(float dt)
 {
-
 	//Update local mines list
 	for (vector<ProximityMine*>::iterator itr = local_minelist.begin(); itr != local_minelist.end(); itr++)
 	{
@@ -361,6 +365,7 @@ void Application::UpdateMines(float dt)
 				if (ships_.at(0)->GetHealth() <= 0 && ships_.at(0)->GetAlive())
 				{
 					ships_.at(0)->SetAlive(false);
+					ships_.at(0)->UpdateRespawnLocation();
 					++deaths;
 				}
 			}
@@ -386,6 +391,7 @@ void Application::UpdateMines(float dt)
 				if (ships_.at(0)->GetHealth() <= 0 && ships_.at(0)->GetAlive())
 				{
 					ships_.at(0)->SetAlive(false);
+					ships_.at(0)->UpdateRespawnLocation();
 					++deaths;
 					sendKillCredits = true;
 				}
@@ -546,7 +552,7 @@ bool Application::UpdatePackets(float dt)
 									bs.Read(y);
 									bs.Read(w);
 									(*itr)->SetServerLocation(x, y, w);
-
+									std::cout << "Received X: " << x << "Received Y: " << y << std::endl;
 									bs.Read(health);
 									(*itr)->SetHealth(health);
 
@@ -736,7 +742,7 @@ bool Application::UpdatePackets(float dt)
 		bs2.Write(ships_.at(0)->GetServerVelocityX());
 		bs2.Write(ships_.at(0)->GetServerVelocityY());
 		bs2.Write(ships_.at(0)->GetAngularVelocity());
-
+		std::cout << "Sent X: " << ships_.at(0)->GetServerX() << " Sent Y: " << ships_.at(0)->GetServerY() << std::endl;
 #else
 		bs2.Write(ships_.at(0)->GetID());
 		bs2.Write(ships_.at(0)->GetX());
@@ -819,10 +825,7 @@ void Application::Render()
 	ShipList::iterator itr;
 	for (itr = ships_.begin(); itr != ships_.end(); itr++)
 	{
-		if ((*itr)->GetAlive())
-		{
-			(*itr)->Render();
-		}
+		(*itr)->Render();
 	}
 
 	for (vector<explosion*>::iterator itr = explosion_list.begin(); itr != explosion_list.end(); itr++)

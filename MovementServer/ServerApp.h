@@ -10,7 +10,7 @@
 
 class HGE;
 
-#define NEW_POWERUP_DELAY_TIMER 10.f
+#define NEW_POWERUP_DELAY_TIMER 15.f
 #define FRAMETIME 0.01f
 
 class RakPeerInterface;

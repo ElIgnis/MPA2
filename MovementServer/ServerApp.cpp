@@ -11,8 +11,8 @@ rakpeer_(RakNetworkFactory::GetRakPeerInterface()),
 newID(0),
 pwrUp_SpawnTimer(0.f),
 sendCount(0),
-x(0),
-y(0)
+x(rand() % 600 + 100),
+y(rand() % 500 + 100)
 {
 	rakpeer_->Startup(2, 30, &SocketDescriptor(1691, 0), 1);
 	rakpeer_->SetMaximumIncomingConnections(2);
@@ -144,8 +144,8 @@ void ServerApp::Loop()
 
 		if (sendCount == newID)
 		{
-			x = rand() % 600 + 200;
-			y = rand() % 400 + 200;
+			x = rand() % 600 + 100;
+			y = rand() % 500 + 100;
 			sendCount = 0;
 			pwrUp_SpawnTimer = 0.f;
 		}
