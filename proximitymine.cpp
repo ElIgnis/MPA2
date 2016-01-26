@@ -6,23 +6,27 @@
 
 extern float GetAbsoluteMag( float num );
 
-ProximityMine::ProximityMine(char* filename, string ownerName) :
-	angular_velocity(0)
-	, collision_X(0.f)
-	, collision_Y(0.f)
-	, ownername("")
-	, damage(20)
-	, additional_damage(0)
-	, selfDamage(false)
-	, active(false)
-	, delayTimer(0.f)
-	, startTimer(false)
+ProximityMine::ProximityMine(string ownerName) 
+: angular_velocity(0)
+, collision_X(0.f)
+, collision_Y(0.f)
+, ownername("")
+, damage(20)
+, additional_damage(0)
+, selfDamage(false)
+, active(false)
+, delayTimer(0.f)
+, startTimer(false)
 {
 	HGE* hge = hgeCreate(HGE_VERSION);
-	tex_ = hge->Texture_Load(filename);
+	inactive_tex_ = hge->Texture_Load(SPR_MINE_INACTIVE);
+	active_tex_ = hge->Texture_Load(SPR_MINE_ACTIVE);
 	hge->Release();
-	sprite_.reset(new hgeSprite(tex_, 0, 0, 32, 32));
-	sprite_->SetHotSpot(16, 16);
+
+	inactive_sprite_.reset(new hgeSprite(inactive_tex_, 0, 0, 32, 32));
+	active_sprite_.reset(new hgeSprite(active_tex_, 0, 0, 32, 32));
+	inactive_sprite_->SetHotSpot(16, 16);
+	active_sprite_->SetHotSpot(16, 16);
 
 	ownername = ownerName;
 	selfDamage = false;
@@ -31,7 +35,8 @@ ProximityMine::ProximityMine(char* filename, string ownerName) :
 ProximityMine::~ProximityMine()
 {
 	HGE* hge = hgeCreate(HGE_VERSION);
-	hge->Texture_Free(tex_);
+	hge->Texture_Free(inactive_tex_);
+	hge->Texture_Free(active_tex_);
 	hge->Release();
 }
 
@@ -98,8 +103,8 @@ bool ProximityMine::Update(std::vector<Ship*> &shiplist, float timedelta)
 	//Wrap around
 	float screenwidth = static_cast<float>(hge->System_GetState(HGE_SCREENWIDTH));
 	float screenheight = static_cast<float>(hge->System_GetState(HGE_SCREENHEIGHT));
-	float spritewidth = sprite_->GetWidth();
-	float spriteheight = sprite_->GetHeight();
+	float spritewidth = inactive_sprite_->GetWidth();
+	float spriteheight = inactive_sprite_->GetHeight();
 	if (x_ < -spritewidth / 2)
 		x_ += screenwidth + spritewidth;
 	else if (x_ > screenwidth + spritewidth / 2)
@@ -115,12 +120,19 @@ bool ProximityMine::Update(std::vector<Ship*> &shiplist, float timedelta)
 
 void ProximityMine::Render()
 {
-	sprite_->RenderEx(x_, y_, w_);
+	if (active)
+	{
+		active_sprite_->RenderEx(x_, y_, w_);
+	}
+	else
+	{
+		inactive_sprite_->RenderEx(x_, y_, w_);
+	}
 }
 
 bool ProximityMine::HasCollided( Ship &ship )
 {
-	sprite_->GetBoundingBox( x_, y_, &collidebox);
+	inactive_sprite_->GetBoundingBox(x_, y_, &collidebox);
 
 	return collidebox.Intersect( ship.GetBoundingBox() );
 }

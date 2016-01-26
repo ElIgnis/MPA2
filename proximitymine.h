@@ -15,14 +15,16 @@ class Ship;
 using std::string;
 
 #define DELAY_DURATION 3.f
-#define SPR_MINE "Images/proxmine.png"
+#define SPR_MINE_INACTIVE "Images/proxmine_inactive.png"
+#define SPR_MINE_ACTIVE "Images/proxmine_active.png"
 #define SPR_MINE_READY "Images/Mine_Usable.png"
 #define SPR_MINE_UNREADY "Images/Mine_Unusable.png"
 
 class ProximityMine
 {
-	HTEXTURE tex_; //!< Handle to the sprite's texture
-	std::auto_ptr<hgeSprite> sprite_; //!< The sprite used to display the mine
+	HTEXTURE inactive_tex_, active_tex_; //!< Handle to the sprite's texture
+	std::auto_ptr<hgeSprite> inactive_sprite_; //!< The sprite used to display the inactive mine
+	std::auto_ptr<hgeSprite> active_sprite_; //!< The sprite used to display the active mine
 	float x_; //!< The x-coordinate of the mine
 	float y_; //!< The y-coordinate of the mine
 	float w_; //!< The angular position of the mine
@@ -40,7 +42,7 @@ class ProximityMine
 
 public:
 	float angular_velocity;
-	ProximityMine(char* filename, string ownerName);
+	ProximityMine(string ownerName);
 	~ProximityMine();
 	void Init(float x, float y, float w, float vel_X, float vel_Y, int ownerID);
 	bool Update(std::vector<Ship*> &shiplist, float timedelta);

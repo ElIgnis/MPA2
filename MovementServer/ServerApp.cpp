@@ -14,8 +14,8 @@ sendCount(0),
 x(rand() % 600 + 100),
 y(rand() % 500 + 100)
 {
-	rakpeer_->Startup(2, 30, &SocketDescriptor(1691, 0), 1);
-	rakpeer_->SetMaximumIncomingConnections(2);
+	rakpeer_->Startup(100, 30, &SocketDescriptor(1691, 0), 1);
+	rakpeer_->SetMaximumIncomingConnections(100);
 	rakpeer_->SetOccasionalPing(true);
 	std::cout << "Server Started" << std::endl;
 	srand(time(NULL));
@@ -154,35 +154,51 @@ void ServerApp::Loop()
 
 void ServerApp::SendWelcomePackage(SystemAddress& addr)
 {
+	//Only accept less than 2 clients
 	++newID;
-	unsigned int shipcount = static_cast<unsigned int>(clients_.size());
-	unsigned char msgid = ID_WELCOME;
-
-	RakNet::BitStream bs;
-	bs.Write(msgid);
-	bs.Write(newID);
-	bs.Write(shipcount);
-
-	for (ClientMap::iterator itr = clients_.begin(); itr != clients_.end(); ++itr)
+	if (newID <= 2)
 	{
-		std::cout << "Ship " << itr->second.id << " pos" << itr->second.x_ << " " << itr->second.y_ << std::endl;
+		unsigned int shipcount = static_cast<unsigned int>(clients_.size());
+		unsigned char msgid = ID_WELCOME;
 
-		bs.Write(itr->second.id);
-		bs.Write(itr->second.name.c_str());
-		bs.Write(itr->second.x_);
-		bs.Write(itr->second.y_);
-		bs.Write(itr->second.type_);
+		RakNet::BitStream bs;
+		bs.Write(msgid);
+		bs.Write(newID);
+		bs.Write(shipcount);
+
+		for (ClientMap::iterator itr = clients_.begin(); itr != clients_.end(); ++itr)
+		{
+			std::cout << "Ship " << itr->second.id << " pos" << itr->second.x_ << " " << itr->second.y_ << std::endl;
+
+			bs.Write(itr->second.id);
+			bs.Write(itr->second.name.c_str());
+			bs.Write(itr->second.x_);
+			bs.Write(itr->second.y_);
+			bs.Write(itr->second.type_);
+		}
+
+		rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
+
+		bs.Reset();
+
+		GameObject newobject(newID);
+
+		clients_.insert(std::make_pair(addr, newobject));
+
+		std::cout << "New guy, assigned id " << newID << std::endl;
 	}
+	//Reject new clients
+	else
+	{
+		unsigned char msgid = ID_REJECTSHIP;
 
-	rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
+		RakNet::BitStream bs;
+		bs.Write(msgid);
 
-	bs.Reset();
+		rakpeer_->Send(&bs, HIGH_PRIORITY, RELIABLE_ORDERED, 0, addr, false);
 
-	GameObject newobject(newID);
-
-	clients_.insert(std::make_pair(addr, newobject));
-
-	std::cout << "New guy, assigned id " << newID << std::endl;
+		bs.Reset();
+	}
 }
 
 void ServerApp::SendDisconnectionNotification(SystemAddress& addr)

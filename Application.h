@@ -41,6 +41,7 @@ class Application
 	RakPeerInterface* rakpeer_;
 	unsigned int timer_;
 
+	bool connection_rejected;
 	bool keydown_fire;
 	bool keydown_mine;
 

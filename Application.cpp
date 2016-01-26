@@ -46,6 +46,7 @@ Application::Application()
 , kills(0)
 , deaths(0)
 , sendKillCredits(false)
+, connection_rejected(false)
 {
 }
 
@@ -136,7 +137,7 @@ bool Application::Init()
 		//Initialise 5 mines
 		for (int i = 0; i < 5; ++i)
 		{
-			local_minelist.push_back(new ProximityMine(SPR_MINE, ShipName));
+			local_minelist.push_back(new ProximityMine(ShipName));
 		}
 
 		//Font
@@ -180,8 +181,15 @@ bool Application::Update()
 	UpdatePowerups(timedelta);
 
 	if (UpdatePackets(timedelta))
+	{
+		if (connection_rejected)
+		{
+			std::cin.ignore(255, '\n');
+			std::cin.get();
+		}
 		return true;
-
+	}
+		
 	return false;
 }
 
@@ -515,7 +523,12 @@ bool Application::UpdatePackets(float dt)
 
 		}
 			break;
-
+		//Close client
+		case ID_REJECTSHIP:
+			std::cout << "Maximum players detected, connection rejected" << std::endl;
+			connection_rejected = true;
+			return true;
+			break;
 		case ID_LOSTSHIP:
 		{
 							unsigned int shipid;
@@ -552,7 +565,7 @@ bool Application::UpdatePackets(float dt)
 									bs.Read(y);
 									bs.Read(w);
 									(*itr)->SetServerLocation(x, y, w);
-									std::cout << "Received X: " << x << "Received Y: " << y << std::endl;
+									
 									bs.Read(health);
 									(*itr)->SetHealth(health);
 
@@ -680,7 +693,7 @@ bool Application::UpdatePackets(float dt)
 								 bs.Read(vel_x);
 								 bs.Read(vel_y);
 
-								 net_minelist.push_back(new ProximityMine(SPR_MINE, rs.C_String()));
+								 net_minelist.push_back(new ProximityMine(rs.C_String()));
 								 net_minelist.back()->Init(x, y, w, vel_x, vel_y, id);
 		}
 			break;
@@ -742,7 +755,6 @@ bool Application::UpdatePackets(float dt)
 		bs2.Write(ships_.at(0)->GetServerVelocityX());
 		bs2.Write(ships_.at(0)->GetServerVelocityY());
 		bs2.Write(ships_.at(0)->GetAngularVelocity());
-		std::cout << "Sent X: " << ships_.at(0)->GetServerX() << " Sent Y: " << ships_.at(0)->GetServerY() << std::endl;
 #else
 		bs2.Write(ships_.at(0)->GetID());
 		bs2.Write(ships_.at(0)->GetX());
