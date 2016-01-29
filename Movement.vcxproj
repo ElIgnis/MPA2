@@ -95,6 +95,7 @@
     <ClCompile Include="Application.cpp" />
     <ClCompile Include="explosion.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="NameProcessor.cpp" />
     <ClCompile Include="projectile_powerup.cpp" />
     <ClCompile Include="proximitymine.cpp" />
     <ClCompile Include="projectile.cpp" />
@@ -104,6 +105,7 @@
     <ClInclude Include="Application.h" />
     <ClInclude Include="explosion.h" />
     <ClInclude Include="Globals.h" />
+    <ClInclude Include="NameProcessor.h" />
     <ClInclude Include="projectile_powerup.h" />
     <ClInclude Include="proximitymine.h" />
     <ClInclude Include="projectile.h" />

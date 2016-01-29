@@ -6,6 +6,7 @@
 #include "explosion.h"
 #include "proximitymine.h"
 #include "projectile_powerup.h"
+#include "NameProcessor.h"
 
 #include <vector>
 #include <hge.h>
@@ -33,6 +34,9 @@ static const float DEFAULT_ACCELERATION = 50.0f;
 *
 */
 
+#define SPR_TITLE "Images/Title.png"
+#define TEXT_DELAY 2.f
+
 class Application
 {
 	HGE* hge_; //!< Instance of the internal graphics engine
@@ -49,7 +53,8 @@ class Application
 	std::auto_ptr<hgeSprite> background_Left, background_Right;
 	std::auto_ptr<hgeSprite> cursor_;
 	std::auto_ptr<hgeSprite> explosion_;
-	HTEXTURE bg_tex_, explosion_tex_, cursor_tex;
+	std::auto_ptr<hgeSprite> title_;
+	HTEXTURE bg_tex_, explosion_tex_, cursor_tex, title_tex;
 	bool showCursor;
 	float Left_X;
 	float Right_X;
@@ -91,12 +96,16 @@ class Application
 	std::auto_ptr<hgeFont> font_;
 	std::string playerHealth, playerKills, playerDeaths;
 
-
 	//Player Tracking
 	string ShipName;
 	string Attacker;
 	const char* ShipName_Const;
 	RakNet::RakString rs;
+	NameProcessor Player_NameProcessor;
+	bool nameProcessed, nameTooShort;
+	float textDelay;
+
+	void ProcessName(void);
 
 	bool Init();
 	static bool Loop();
@@ -112,7 +121,8 @@ public:
 
 	void Start();
 	bool Update();
-	bool UpdateKeypress();
+	void UpdateKeypress();
+	void UpdateBG(float dt);
 	void UpdateShips(float dt);
 	void UpdateProjectiles(float dt);
 	void UpdateMines(float dt);

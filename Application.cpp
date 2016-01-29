@@ -47,6 +47,9 @@ Application::Application()
 , deaths(0)
 , sendKillCredits(false)
 , connection_rejected(false)
+, nameProcessed(false)
+, nameTooShort(false)
+, textDelay(0.f)
 {
 }
 
@@ -100,10 +103,6 @@ bool Application::Init()
 
 		//Initialise ships
 		ships_.push_back(new Ship(rand() % 3 + 1, rand() % 500 + 100, rand() % 400 + 100));
-		std::cout << "Please enter your name: ";
-		std::cin >> ShipName;
-		rs.Set(ShipName.c_str());
-		ships_.at(0)->SetName(ShipName.c_str());
 
 		//Weapon icons
 		tex_pwrlvl1 = hge_->Texture_Load(SPR_PROJ_PWRUP_LVLONE);
@@ -113,6 +112,7 @@ bool Application::Init()
 
 		tex_mine_unready = hge_->Texture_Load(SPR_MINE_UNREADY);
 		tex_mine_ready = hge_->Texture_Load(SPR_MINE_READY);
+		title_tex = hge_->Texture_Load(SPR_TITLE);
 
 		pwrlvl1_.reset(new hgeSprite(tex_pwrlvl1, 0, 0, 64, 64));
 		pwrlvl2_.reset(new hgeSprite(tex_pwrlvl2, 0, 0, 64, 64));
@@ -121,6 +121,7 @@ bool Application::Init()
 
 		mineunready_.reset(new hgeSprite(tex_mine_unready, 0, 0, 64, 64));
 		mineready_.reset(new hgeSprite(tex_mine_ready, 0, 0, 64, 64));
+		title_.reset(new hgeSprite(title_tex, 0, 0, 328, 263));
 
 		//Initialise 50 explosion effects
 		for (int i = 0; i < 50; ++i)
@@ -170,35 +171,74 @@ bool Application::Init()
 bool Application::Update()
 {
 	float timedelta = hge_->Timer_GetDelta();
+	
+	UpdateBG(timedelta);
 
-	if (UpdateKeypress())
-		return true;
+	ProcessName();
 
-	UpdateShips(timedelta);
-	UpdateProjectiles(timedelta);
-	UpdateMines(timedelta);
-	UpdateExplosions(timedelta);
-	UpdatePowerups(timedelta);
-
-	if (UpdatePackets(timedelta))
+	if (nameTooShort)
 	{
-		if (connection_rejected)
-		{
-			std::cin.ignore(255, '\n');
-			std::cin.get();
-		}
-		return true;
-	}
-		
-	return false;
-}
+		textDelay += timedelta;
 
-bool Application::UpdateKeypress()
-{
-	float timedelta = hge_->Timer_GetDelta();
+		if (textDelay > TEXT_DELAY)
+		{
+			nameTooShort = false;
+			textDelay = 0.f;
+		}
+	}
 
 	if (hge_->Input_GetKeyState(HGEK_ESCAPE))
 		return true;
+
+	if (nameProcessed)
+	{
+		UpdateKeypress();
+		UpdateShips(timedelta);
+		UpdateProjectiles(timedelta);
+		UpdateMines(timedelta);
+		UpdateExplosions(timedelta);
+		UpdatePowerups(timedelta);
+
+		if (UpdatePackets(timedelta))
+		{
+			if (connection_rejected)
+			{
+				std::cin.ignore(255, '\n');
+				std::cin.get();
+			}
+			return true;
+		}
+	}
+	return false;
+}
+
+void Application::UpdateBG(float dt)
+{
+	//Background scrolling
+	Left_X -= 20 * dt;
+	if (Left_X < -800)
+	{
+		Left_X = 800;
+	}
+	if (Left_X > 800)
+	{
+		Left_X = -800;
+	}
+
+	Right_X -= 20 * dt;
+	if (Right_X > 800)
+	{
+		Right_X = -800;
+	}
+	if (Right_X < -800)
+	{
+		Right_X = 800;
+	}
+}
+
+void Application::UpdateKeypress()
+{
+	float timedelta = hge_->Timer_GetDelta();
 
 	ships_.at(0)->SetAngularVelocity(0.0f);
 
@@ -259,28 +299,6 @@ bool Application::UpdateKeypress()
 			}
 		}
 	}
-
-	Left_X -= 20 * timedelta;
-	if (Left_X < -800)
-	{
-		Left_X = 800;
-	}
-	if (Left_X > 800)
-	{
-		Left_X = -800;
-	}
-
-	Right_X -= 20 * timedelta;
-	if (Right_X > 800)
-	{
-		Right_X = -800;
-	}
-	if (Right_X < -800)
-	{
-		Right_X = 800;
-	}
-	
-	return false;
 }
 
 void Application::UpdateShips(float dt)
@@ -831,65 +849,68 @@ void Application::Render()
 {
 	hge_->Gfx_BeginScene();
 	hge_->Gfx_Clear(0);
+
 	background_Left->Render(Left_X, 0);
 	background_Right->Render(Right_X, 0);
-
-	ShipList::iterator itr;
-	for (itr = ships_.begin(); itr != ships_.end(); itr++)
+	if (nameProcessed)
 	{
-		(*itr)->Render();
-	}
-
-	for (vector<explosion*>::iterator itr = explosion_list.begin(); itr != explosion_list.end(); itr++)
-	{
-		if ((*itr)->GetActive())
+		ShipList::iterator itr;
+		for (itr = ships_.begin(); itr != ships_.end(); itr++)
 		{
 			(*itr)->Render();
 		}
-	}
 
-	//Render Local list projectiles
-	for (vector<Projectile*>::iterator itr = local_projlist.begin(); itr != local_projlist.end(); itr++)
-	{
-		if ((*itr)->GetActive())
+		for (vector<explosion*>::iterator itr = explosion_list.begin(); itr != explosion_list.end(); itr++)
 		{
-			(*itr)->Render();
+			if ((*itr)->GetActive())
+			{
+				(*itr)->Render();
+			}
 		}
-	}
 
-	//Render Network list projectiles
-	for (vector<Projectile*>::iterator itr = net_projlist.begin(); itr != net_projlist.end(); itr++)
-	{
-		if ((*itr)->GetActive())
+		//Render Local list projectiles
+		for (vector<Projectile*>::iterator itr = local_projlist.begin(); itr != local_projlist.end(); itr++)
 		{
-			(*itr)->Render();
+			if ((*itr)->GetActive())
+			{
+				(*itr)->Render();
+			}
 		}
-	}
 
-	//Render Local list mines
-	for (vector<ProximityMine*>::iterator itr = local_minelist.begin(); itr != local_minelist.end(); itr++)
-	{
-		if ((*itr)->GetActive())
+		//Render Network list projectiles
+		for (vector<Projectile*>::iterator itr = net_projlist.begin(); itr != net_projlist.end(); itr++)
 		{
-			(*itr)->Render();
+			if ((*itr)->GetActive())
+			{
+				(*itr)->Render();
+			}
 		}
-	}
 
-	//Render Network list mines
-	for (vector<ProximityMine*>::iterator itr = net_minelist.begin(); itr != net_minelist.end(); itr++)
-	{
-		if ((*itr)->GetActive())
+		//Render Local list mines
+		for (vector<ProximityMine*>::iterator itr = local_minelist.begin(); itr != local_minelist.end(); itr++)
 		{
-			(*itr)->Render();
+			if ((*itr)->GetActive())
+			{
+				(*itr)->Render();
+			}
 		}
-	}
-	
-	//Render Powerups
-	for (vector<Projectile_PowerUp*>::iterator itr = network_proj_powerup_list.begin(); itr != network_proj_powerup_list.end(); itr++)
-	{
-		if ((*itr)->GetActive())
+
+		//Render Network list mines
+		for (vector<ProximityMine*>::iterator itr = net_minelist.begin(); itr != net_minelist.end(); itr++)
 		{
-			(*itr)->Render();
+			if ((*itr)->GetActive())
+			{
+				(*itr)->Render();
+			}
+		}
+
+		//Render Powerups
+		for (vector<Projectile_PowerUp*>::iterator itr = network_proj_powerup_list.begin(); itr != network_proj_powerup_list.end(); itr++)
+		{
+			if ((*itr)->GetActive())
+			{
+				(*itr)->Render();
+			}
 		}
 	}
 
@@ -907,54 +928,74 @@ void Application::Render()
 
 void Application::RenderUI(void)
 {
-	//Health
-	font_->printf(20, 550, HGETEXT_LEFT, "%s%d", "Player Health: ", ships_.at(0)->GetHealth());
-
-	//Projectile power
-	switch (ships_.at(0)->GetPower())
+	if (!nameProcessed)
 	{
-	case 0:
-		pwrlvl1_->Render(450, 530);
-		break;
-	case 1:
-		pwrlvl2_->Render(460, 530);
-		break;
-	case 2:
-		pwrlvl3_->Render(460, 530);
-		break;
-	case 3:
-		pwrlvlmax_->Render(460, 530);
-		break;
-	default:
-		break;
-	}
-
-	font_->printf(300, 550, HGETEXT_LEFT, "%s", "Power Level:");
-
-	int UsableMines = 0;
-
-	//Mine state
-	for (vector<ProximityMine*>::iterator itr = local_minelist.begin(); itr != local_minelist.end(); ++itr)
-	{
-		if ((*itr)->GetActive() == false)
+		title_->Render(250, 10);
+		if (nameTooShort)
 		{
-			++UsableMines;
+			font_->printf(200, 450, HGETEXT_LEFT, "%s", "Error, name is too short");
 		}
-	}
-	if (UsableMines > 0)
-	{
-		mineready_->Render(620, 530);
+		//Entering name here
+		std::ostringstream HighScoreName;
+		for (unsigned i = 0; i < Player_NameProcessor.GetNameChar().size(); ++i)
+		{
+			HighScoreName << Player_NameProcessor.GetNameChar()[i];
+		}
+		font_->printf(120, 350, HGETEXT_LEFT, "%s", "Please enter a name between 4 to 14 characters");
+		font_->printf(200, 400, HGETEXT_LEFT, "%s%s", "Player name: ", HighScoreName.str().c_str());
+		font_->printf(200, 500, HGETEXT_LEFT, "%s", "Press enter to confirm, esc to quit");
 	}
 	else
 	{
-		mineunready_->Render(620, 530);
+		//Health
+		font_->printf(20, 550, HGETEXT_LEFT, "%s%d", "Player Health: ", ships_.at(0)->GetHealth());
+
+		//Projectile power
+		switch (ships_.at(0)->GetPower())
+		{
+		case 0:
+			pwrlvl1_->Render(450, 530);
+			break;
+		case 1:
+			pwrlvl2_->Render(460, 530);
+			break;
+		case 2:
+			pwrlvl3_->Render(460, 530);
+			break;
+		case 3:
+			pwrlvlmax_->Render(460, 530);
+			break;
+		default:
+			break;
+		}
+
+		font_->printf(300, 550, HGETEXT_LEFT, "%s", "Power Level:");
+
+		int UsableMines = 0;
+
+		//Mine state
+		for (vector<ProximityMine*>::iterator itr = local_minelist.begin(); itr != local_minelist.end(); ++itr)
+		{
+			if ((*itr)->GetActive() == false)
+			{
+				++UsableMines;
+			}
+		}
+		if (UsableMines > 0)
+		{
+			mineready_->Render(620, 530);
+		}
+		else
+		{
+			mineunready_->Render(620, 530);
+		}
+
+		font_->printf(550, 550, HGETEXT_LEFT, "%s        x%d", "Mines: ", UsableMines);
+
+		//KD
+		font_->printf(20, 500, HGETEXT_LEFT, "%s%d", "Kills: ", kills);
+		font_->printf(150, 500, HGETEXT_LEFT, "%s%d", "Deaths: ", deaths);
 	}
-
-	font_->printf(550, 550, HGETEXT_LEFT, "%s        x%d", "Mines: ", UsableMines);
-
-	//KD
-	font_->printf(20, 500, HGETEXT_LEFT, "%s%d", "Kills: ", kills);
-	font_->printf(150, 500, HGETEXT_LEFT, "%s%d", "Deaths: ", deaths);
 }
 
 /**
@@ -1020,11 +1061,377 @@ void Application::Start()
 	}
 }
 
+void Application::ProcessName(void)
+{
+	//Name input for high scores
+	if (Player_NameProcessor.GetNameCharCount() < MAXNAMELENGTH)
+	{
+		if (hge_->Input_GetKeyState(VK_SHIFT))
+			Player_NameProcessor.SetCapitalLetter(true);
+		else
+			Player_NameProcessor.SetCapitalLetter(false);
+
+		//Alpha key states
+		static bool b_AKeyState = false;
+		static bool b_BKeyState = false;
+		static bool b_CKeyState = false;
+		static bool b_DKeyState = false;
+		static bool b_EKeyState = false;
+		static bool b_FKeyState = false;
+		static bool b_GKeyState = false;
+		static bool b_HKeyState = false;
+		static bool b_IKeyState = false;
+		static bool b_JKeyState = false;
+		static bool b_KKeyState = false;
+		static bool b_LKeyState = false;
+		static bool b_MKeyState = false;
+		static bool b_NKeyState = false;
+		static bool b_OKeyState = false;
+		static bool b_PKeyState = false;
+		static bool b_QKeyState = false;
+		static bool b_RKeyState = false;
+		static bool b_SKeyState = false;
+		static bool b_TKeyState = false;
+		static bool b_UKeyState = false;
+		static bool b_VKeyState = false;
+		static bool b_WKeyState = false;
+		static bool b_XKeyState = false;
+		static bool b_YKeyState = false;
+		static bool b_ZKeyState = false;
+
+		//A Key
+		if (hge_->Input_GetKeyState('A') && !b_AKeyState)
+		{
+			b_AKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('A') && b_AKeyState)
+		{
+			b_AKeyState = false;
+			Player_NameProcessor.SetCharToAdd('a');
+		}
+
+		//B Key
+		if (hge_->Input_GetKeyState('B') && !b_BKeyState)
+		{
+			b_BKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('B') && b_BKeyState)
+		{
+			b_BKeyState = false;
+			Player_NameProcessor.SetCharToAdd('b');
+		}
+
+		//C Key
+		if (hge_->Input_GetKeyState('C') && !b_CKeyState)
+		{
+			b_CKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('C') && b_CKeyState)
+		{
+			b_CKeyState = false;
+			Player_NameProcessor.SetCharToAdd('c');
+		}
+
+		//D Key
+		if (hge_->Input_GetKeyState('D') && !b_DKeyState)
+		{
+			b_DKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('D') && b_DKeyState)
+		{
+			b_DKeyState = false;
+			Player_NameProcessor.SetCharToAdd('d');
+		}
+
+		//E Key
+		if (hge_->Input_GetKeyState('E') && !b_EKeyState)
+		{
+			b_EKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('E') && b_EKeyState)
+		{
+			b_EKeyState = false;
+			Player_NameProcessor.SetCharToAdd('e');
+		}
+
+		//F Key
+		if (hge_->Input_GetKeyState('F') && !b_FKeyState)
+		{
+			b_FKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('F') && b_FKeyState)
+		{
+			b_FKeyState = false;
+			Player_NameProcessor.SetCharToAdd('f');
+		}
+
+		//G Key
+		if (hge_->Input_GetKeyState('G') && !b_GKeyState)
+		{
+			b_GKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('G') && b_GKeyState)
+		{
+			b_GKeyState = false;
+			Player_NameProcessor.SetCharToAdd('g');
+		}
+
+		//H Key
+		if (hge_->Input_GetKeyState('H') && !b_HKeyState)
+		{
+			b_HKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('H') && b_HKeyState)
+		{
+			b_HKeyState = false;
+			Player_NameProcessor.SetCharToAdd('h');
+		}
+
+		//I Key
+		if (hge_->Input_GetKeyState('I') && !b_IKeyState)
+		{
+			b_IKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('I') && b_IKeyState)
+		{
+			b_IKeyState = false;
+			Player_NameProcessor.SetCharToAdd('i');
+		}
+
+		//J Key
+		if (hge_->Input_GetKeyState('J') && !b_JKeyState)
+		{
+			b_JKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('J') && b_JKeyState)
+		{
+			b_JKeyState = false;
+			Player_NameProcessor.SetCharToAdd('j');
+		}
+
+		//K Key
+		if (hge_->Input_GetKeyState('K') && !b_KKeyState)
+		{
+			b_KKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('K') && b_KKeyState)
+		{
+			b_KKeyState = false;
+			Player_NameProcessor.SetCharToAdd('k');
+		}
+
+		//L Key
+		if (hge_->Input_GetKeyState('L') && !b_LKeyState)
+		{
+			b_LKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('L') && b_LKeyState)
+		{
+			b_LKeyState = false;
+			Player_NameProcessor.SetCharToAdd('l');
+		}
+
+		//M Key
+		if (hge_->Input_GetKeyState('M') && !b_MKeyState)
+		{
+			b_MKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('M') && b_MKeyState)
+		{
+			b_MKeyState = false;
+			Player_NameProcessor.SetCharToAdd('m');
+		}
+
+		//N Key
+		if (hge_->Input_GetKeyState('N') && !b_NKeyState)
+		{
+			b_NKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('N') && b_NKeyState)
+		{
+			b_NKeyState = false;
+			Player_NameProcessor.SetCharToAdd('n');
+		}
+
+		//O Key
+		if (hge_->Input_GetKeyState('O') && !b_OKeyState)
+		{
+			b_OKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('O') && b_OKeyState)
+		{
+			b_OKeyState = false;
+			Player_NameProcessor.SetCharToAdd('o');
+		}
+
+		//P Key
+		if (hge_->Input_GetKeyState('P') && !b_PKeyState)
+		{
+			b_PKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('P') && b_PKeyState)
+		{
+			b_PKeyState = false;
+			Player_NameProcessor.SetCharToAdd('p');
+		}
+
+		//Q Key
+		if (hge_->Input_GetKeyState('Q') && !b_QKeyState)
+		{
+			b_QKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('Q') && b_QKeyState)
+		{
+			b_QKeyState = false;
+			Player_NameProcessor.SetCharToAdd('q');
+		}
+
+		//R Key
+		if (hge_->Input_GetKeyState('R') && !b_RKeyState)
+		{
+			b_RKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('R') && b_RKeyState)
+		{
+			b_RKeyState = false;
+			Player_NameProcessor.SetCharToAdd('r');
+		}
+
+		//S Key
+		if (hge_->Input_GetKeyState('S') && !b_SKeyState)
+		{
+			b_SKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('S') && b_SKeyState)
+		{
+			b_SKeyState = false;
+			Player_NameProcessor.SetCharToAdd('s');
+		}
+
+		//T Key
+		if (hge_->Input_GetKeyState('T') && !b_TKeyState)
+		{
+			b_TKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('T') && b_TKeyState)
+		{
+			b_TKeyState = false;
+			Player_NameProcessor.SetCharToAdd('t');
+		}
+
+		//U Key
+		if (hge_->Input_GetKeyState('U') && !b_UKeyState)
+		{
+			b_UKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('U') && b_UKeyState)
+		{
+			b_UKeyState = false;
+			Player_NameProcessor.SetCharToAdd('u');
+		}
+
+		//V Key
+		if (hge_->Input_GetKeyState('V') && !b_VKeyState)
+		{
+			b_VKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('V') && b_VKeyState)
+		{
+			b_VKeyState = false;
+			Player_NameProcessor.SetCharToAdd('v');
+		}
+
+		//W Key
+		if (hge_->Input_GetKeyState('W') && !b_WKeyState)
+		{
+			b_WKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('W') && b_WKeyState)
+		{
+			b_WKeyState = false;
+			Player_NameProcessor.SetCharToAdd('w');
+		}
+
+		//X Key
+		if (hge_->Input_GetKeyState('X') && !b_XKeyState)
+		{
+			b_XKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('X') && b_XKeyState)
+		{
+			b_XKeyState = false;
+			Player_NameProcessor.SetCharToAdd('x');
+		}
+
+		//Y Key
+		if (hge_->Input_GetKeyState('Y') && !b_YKeyState)
+		{
+			b_YKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('Y') && b_YKeyState)
+		{
+			b_YKeyState = false;
+			Player_NameProcessor.SetCharToAdd('y');
+		}
+
+		//Z Key
+		if (hge_->Input_GetKeyState('Z') && !b_ZKeyState)
+		{
+			b_ZKeyState = true;
+		}
+		if (!hge_->Input_GetKeyState('Z') && b_ZKeyState)
+		{
+			b_ZKeyState = false;
+			Player_NameProcessor.SetCharToAdd('z');
+		}
+
+		//Only adds non empty character
+		if (Player_NameProcessor.GetCharToAdd() != ' ')
+		{
+			if (Player_NameProcessor.GetCapitalLetter())
+			{
+				Player_NameProcessor.SetCharToAdd(Player_NameProcessor.GetCharToAdd() - 32);
+			}
+			Player_NameProcessor.AddNameCharCount();
+			Player_NameProcessor.SetNameInput();
+		}
+	}
+
+	//Backspace
+	if (hge_->Input_GetKeyState(VK_BACK) && Player_NameProcessor.GetNameCharCount() > 0)
+	{
+		Player_NameProcessor.SetCharToRemove();
+		Player_NameProcessor.SubtractNameCharCount();
+	}
+
+	//Confirm name
+	if (hge_->Input_GetKeyState(VK_RETURN))
+	{
+		//If 4 characters and above
+		if (Player_NameProcessor.GetNameCharCount() > 3)
+		{
+			std::stringstream name;
+			for (unsigned i = 0; i < Player_NameProcessor.GetNameChar().size(); ++i)
+			{
+				name << Player_NameProcessor.GetNameChar().at(i);
+			}
+			Player_NameProcessor.SetName(name.str());
+			nameProcessed = true;
+		}
+		else
+		{
+			nameTooShort = true;
+		}
+	}
+}
+
 bool Application::SendInitialPosition()
 {
 	RakNet::BitStream bs;
 	unsigned char msgid = ID_INITIALPOS;
-	rs = ShipName.c_str();
+	//rs = Player_NameProcessor.GetName().c_str();
+	rs.Set(Player_NameProcessor.GetName().c_str());
+	ships_.at(0)->SetName(rs);
 	bs.Write(msgid);
 	bs.Write(rs);
 	bs.Write(ships_.at(0)->GetX());
